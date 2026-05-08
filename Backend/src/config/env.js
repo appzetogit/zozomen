@@ -70,6 +70,7 @@ export const config = {
     firebaseWebAppId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID,
     firebaseWebMeasurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID || process.env.FIREBASE_MEASUREMENT_ID,
     firebaseWebVapidKey: process.env.VITE_FIREBASE_VAPID_KEY || process.env.FIREBASE_VAPID_KEY,
+    firebaseVapidPrivateKey: process.env.FIREBASE_VAPID_PRIVATE_KEY,
 
     // Socket.io
     socketCorsOrigin: process.env.SOCKET_CORS_ORIGIN || '*',
@@ -105,6 +106,7 @@ export const env = {
         databaseURL: process.env.FIREBASE_DATABASE_URL || config.firebaseDatabaseUrl || '',
         serviceAccountPath: config.firebaseServiceAccountPath || '',
         serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || config.firebaseServiceAccount || '',
+        vapidPrivateKey: process.env.FIREBASE_VAPID_PRIVATE_KEY || '',
     },
 
 };
