@@ -25,6 +25,7 @@ const SellerProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLocationSaving, setIsLocationSaving] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -71,14 +72,55 @@ const SellerProfile = () => {
     }
   };
 
-  const handleLocationSelect = (location) => {
+  const syncLocationProfileState = (location) => {
     setFormData((prev) => ({
       ...prev,
       lat: location.lat,
       lng: location.lng,
       radius: location.radius,
-      address: location.address,
+      address: location.address || location.formattedAddress || "",
     }));
+  };
+
+  const handleLocationSelect = async (location) => {
+    const nextLocation = {
+      lat: location.lat,
+      lng: location.lng,
+      radius: location.radius,
+      address: location.address || location.formattedAddress || "",
+    };
+
+    syncLocationProfileState(nextLocation);
+    setIsLocationSaving(true);
+
+    try {
+      await sellerApi.updateProfile(nextLocation);
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              serviceRadius: nextLocation.radius,
+              address: nextLocation.address,
+              location: {
+                ...(prev.location || {}),
+                type: "Point",
+                coordinates: [nextLocation.lng, nextLocation.lat],
+                latitude: nextLocation.lat,
+                longitude: nextLocation.lng,
+                formattedAddress: nextLocation.address,
+                address: nextLocation.address,
+              },
+            }
+          : prev,
+      );
+      toast.success("Location updated successfully");
+      await fetchProfile();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to update location");
+      fetchProfile();
+    } finally {
+      setIsLocationSaving(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -105,21 +147,30 @@ const SellerProfile = () => {
   );
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    // Basic phone validation: must be exactly 10 digits
-    if (!/^[0-9]{10}$/.test(formData.phone)) {
+    e?.preventDefault?.();
+
+    const normalizedPhone = String(formData.phone || "")
+      .replace(/[^0-9]/g, "")
+      .slice(-10);
+    const trimmedEmail = String(formData.email || "").trim().toLowerCase();
+
+    // Seller phone is required, but email is optional in the backend model.
+    if (!/^[0-9]{10}$/.test(normalizedPhone)) {
       toast.error("Please enter a valid 10-digit phone number.");
       return;
     }
-    // Basic email validation
-    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       toast.error("Please enter a valid email address.");
       return;
     }
+
     setIsSaving(true);
     try {
       const payload = {
         ...formData,
+        phone: normalizedPhone,
+        email: trimmedEmail,
         lat: formData.lat,
         lng: formData.lng,
         radius: formData.radius,
@@ -127,7 +178,7 @@ const SellerProfile = () => {
       await sellerApi.updateProfile(payload);
       toast.success("Profile updated successfully");
       setIsEditing(false);
-      fetchProfile();
+      await fetchProfile();
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to update profile");
     } finally {
@@ -190,6 +241,7 @@ const SellerProfile = () => {
           <div className="pb-4">
             {!isEditing ? (
               <Button
+                type="button"
                 onClick={() => setIsEditing(true)}
                 className="bg-white/10 backdrop-blur-md text-white border border-white/20 hover:bg-white hover:text-slate-950 transition-all rounded-lg px-12 py-5 flex items-center gap-4 font-black tracking-[3px] text-xs shadow-[0_20px_40px_rgba(0,0,0,0.1)] hover:scale-[1.05] active:scale-[0.95]">
                 <Edit2 size={18} /> EDIT PROFILE
@@ -197,12 +249,14 @@ const SellerProfile = () => {
             ) : (
               <div className="flex gap-4">
                 <Button
+                  type="button"
                   onClick={() => setIsEditing(false)}
                   variant="outline"
                   className="h-[64px] w-[64px] flex items-center justify-center bg-white/5 text-white border border-white/20 hover:bg-white hover:text-slate-900 rounded-lg shadow-lg transition-all backdrop-blur-md">
                   <X size={24} className="stroke-[2.5]" />
                 </Button>
                 <Button
+                  type="button"
                   onClick={handleSubmit}
                   disabled={isSaving}
                   className="bg-white text-slate-950 hover:bg-slate-100 rounded-lg px-12 py-5 font-black tracking-[3px] text-xs flex items-center gap-4 shadow-[0_25px_50px_rgba(0,0,0,0.15)] h-[64px]">
@@ -317,6 +371,7 @@ const SellerProfile = () => {
               </h3>
               {!isEditing && (
                 <Button
+                  type="button"
                   onClick={() => setIsEditing(true)}
                   className="bg-slate-900 text-white hover:bg-black rounded-lg px-6 py-2 text-[10px] font-black tracking-[2px]">
                   MANAGE
@@ -352,8 +407,9 @@ const SellerProfile = () => {
                     <Button
                       type="button"
                       onClick={() => setIsMapOpen(true)}
+                      disabled={isLocationSaving}
                       className="bg-white text-slate-900 border-2 border-slate-200 hover:border-slate-900 rounded-lg px-8 py-3 text-[10px] font-black tracking-[2px] shadow-sm hover:shadow-md transition-all whitespace-nowrap">
-                      CHANGE PIN
+                      {isLocationSaving ? "UPDATING..." : "CHANGE PIN"}
                     </Button>
                   )}
                 </div>
