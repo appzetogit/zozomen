@@ -510,11 +510,11 @@ export default function HomeHeader({
                 <img
                   src={tab.icon}
                   alt={tab.name}
-                  className={`object-contain transition-transform duration-300 ${isActive ? "h-[28px] w-[28px] scale-110" : "h-[24px] w-[24px] brightness-[1.2]"}`}
+                  className={`object-contain transition-transform duration-300 ${isActive ? "h-[28px] w-[28px] scale-110" : "h-[24px] w-[24px] brightness-0 invert opacity-80"}`}
                 />
                 <span
-                  style={{ color: isActive ? theme.activeText : "#ffffff" }}
-                  className={`text-[10px] font-black tracking-tight ${isActive ? "" : "drop-shadow-[0_1px_4px_rgba(0,0,0,0.5)] opacity-90"}`}
+                  style={{ color: "#ffffff" }}
+                  className={`text-[10px] font-black tracking-tight ${isActive ? "opacity-100" : "opacity-80"}`}
                 >
                   {tab.name}
                 </span>
@@ -524,7 +524,7 @@ export default function HomeHeader({
         })}
       </div>
 
-      <div className="relative z-10 pt-0 pb-0 px-3 -mt-[1px] overflow-visible">
+      <div className={cn("relative z-10 pb-0 px-3 overflow-visible", isFood ? "pt-3" : "pt-0")}>
         {isFood && (
           <div className="flex items-center gap-2 mb-2">
             <div
@@ -564,8 +564,8 @@ export default function HomeHeader({
 
             <div className="px-2 flex flex-col items-center justify-center min-w-[64px]">
               <div className="flex flex-col items-center mb-1">
-                <span className="text-[9px] font-black tracking-[0.5px] text-black dark:text-white leading-none">VEG</span>
-                <span className="text-[7px] font-black tracking-[0.5px] text-black/60 dark:text-white/60 leading-none mt-0.5">MODE</span>
+                <span className="text-[9px] font-black tracking-[0.5px] text-white leading-none">VEG</span>
+                <span className="text-[7px] font-black tracking-[0.5px] text-white/70 leading-none mt-0.5">MODE</span>
               </div>
               <div className="scale-[0.80]">
                 <Switch

@@ -159,11 +159,12 @@ const ProductCard = React.memo(
           className,
         )}
         onClick={handleProductClick}>
+        <div
           className={cn(
-          "flex flex-col h-full w-full rounded-xl overflow-hidden transition-all duration-500 product-card-container premium-wave-shimmer",
-          "bg-[#FFF5F5] border border-red-100/50 shadow-sm",
-          "hover:shadow-md"
-        )}>
+            "flex flex-col h-full w-full rounded-xl overflow-hidden transition-all duration-500 product-card-container premium-wave-shimmer",
+            "bg-[#FFF5F5] border border-red-100/50 shadow-sm",
+            "hover:shadow-md",
+          )}>
           {/* Top Image Section */}
           <div className="relative overflow-hidden w-full h-[90px] md:h-[110px] p-1 md:p-2">
             {/* Badge (Professional Tag) */}
