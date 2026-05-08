@@ -930,7 +930,8 @@ export default function Cart() {
   // Calculate pricing from backend whenever cart, address, or coupon changes
   useEffect(() => {
     const calculatePricing = async () => {
-      if (cart.length === 0 || !hasSavedAddress) {
+      // Don't calculate here if it's a mixed or quick cart - those components handle their own pricing
+      if (cart.length === 0 || !hasSavedAddress || (hasQuickItems && hasFoodItems) || isQuickCart) {
         setPricing(null)
         return
       }
@@ -943,6 +944,7 @@ export default function Cart() {
         const resolvedCouponCode = appliedCoupon?.code || couponCode || undefined
 
         const response = await orderAPI.calculateOrder({
+          orderType: "food",
           items,
           restaurantId: resolvedRestaurantId,
           address: defaultAddress,
@@ -1934,11 +1936,21 @@ export default function Cart() {
   }
 
   if (hasQuickItems && hasFoodItems) {
-    return <MixedSharedCart />
+    return (
+      <MixedSharedCart 
+        initialAddress={defaultAddress} 
+        addressMode={deliveryAddressMode} 
+      />
+    )
   }
 
   if (isQuickCart) {
-    return <QuickSharedCart />
+    return (
+      <QuickSharedCart 
+        initialAddress={defaultAddress} 
+        addressMode={deliveryAddressMode} 
+      />
+    )
   }
 
   // Empty cart state - but don't show if order success or placing order modal is active

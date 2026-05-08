@@ -335,9 +335,10 @@ export default function AddressSelectorPage() {
       try { localStorage.setItem("deliveryAddressMode", "saved") } catch {}
       toast.success("Address selected")
       
-      // Redirect to home page after selection
+      // Use "from" state if available, otherwise default to home page
+      const from = location?.state?.from || "/food/user"
       setTimeout(() => {
-        navigate("/food/user")
+        navigate(from, { replace: true })
       }, 500)
     }
   }
@@ -473,9 +474,10 @@ export default function AddressSelectorPage() {
         setAddressAutocompleteValue("")
         setKeywordAddressSuggestions([])
         
-        // Redirect to home page after saving new address
+        // Use "from" state if available, otherwise default to home page
+        const from = location?.state?.from || "/food/user"
         setTimeout(() => {
-          navigate("/food/user")
+          navigate(from, { replace: true })
         }, 500)
       }
     } catch (error) {
