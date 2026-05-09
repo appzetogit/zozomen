@@ -1,9 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/core/context/AuthContext";
 import { useSettings } from "@/core/context/SettingsContext";
 import { cn } from "@/lib/utils";
 import { HiChevronDown } from "react-icons/hi2";
+import { 
+  loadBusinessSettings, 
+  getCachedSettings,
+  getAppLogo,
+  getAppFavicon,
+  getCompanyName,
+  updateBrowserFavicon
+} from "@/modules/common/utils/businessSettings";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import AdminModuleSwitcher from "@/shared/components/AdminModuleSwitcher";
@@ -198,20 +206,64 @@ const SidebarItem = ({
 
 const SidebarContent = ({ items, title, onClose, openMenu, handleToggle, hoveredIdx, setHoveredIdx }) => {
   const { settings } = useSettings();
-  const appName = settings?.appName || 'App';
   const location = useLocation();
   const isAdminPanel = location.pathname.startsWith("/admin");
+  const isSellerPanel = location.pathname.startsWith("/seller");
+  const appType = isAdminPanel ? 'admin' : (isSellerPanel ? 'seller' : 'user');
+
+  const [logoUrl, setLogoUrl] = useState(() => getAppLogo(appType));
+  const [companyName, setCompanyName] = useState(() => getCompanyName());
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const cached = getCachedSettings();
+        if (cached) {
+          setLogoUrl(getAppLogo(appType));
+          setCompanyName(getCompanyName());
+          const appFav = getAppFavicon(appType);
+          if (appFav) updateBrowserFavicon(appFav);
+        } else {
+          const fresh = await loadBusinessSettings();
+          if (fresh) {
+            setLogoUrl(getAppLogo(appType));
+            setCompanyName(getCompanyName());
+            const appFav = getAppFavicon(appType);
+            if (appFav) updateBrowserFavicon(appFav);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading sidebar settings:", err);
+      }
+    };
+    loadSettings();
+
+    const handleUpdate = (e) => {
+      const settings = e.detail;
+      setLogoUrl(getAppLogo(appType));
+      if (settings?.companyName) setCompanyName(settings.companyName);
+      const appFav = getAppFavicon(appType);
+      if (appFav) updateBrowserFavicon(appFav);
+    };
+
+    window.addEventListener('businessSettingsUpdated', handleUpdate);
+    return () => window.removeEventListener('businessSettingsUpdated', handleUpdate);
+  }, [appType]);
 
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-shrink-0 flex h-16 items-center justify-between px-5 border-b border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent z-10">
         <div className="flex items-center space-x-2.5">
-          <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/30 transform -rotate-6 hover:rotate-0 transition-all duration-500 ease-out">
-            <span className="text-lg font-black italic">{appName.charAt(0)}</span>
-          </div>
+          {logoUrl ? (
+            <img src={logoUrl} alt={companyName} className="h-9 w-auto object-contain" />
+          ) : (
+            <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/30 transform -rotate-6 hover:rotate-0 transition-all duration-500 ease-out">
+              <span className="text-lg font-black italic">{companyName?.charAt(0) || 'Z'}</span>
+            </div>
+          )}
           <div>
             <h1 className="text-base font-black tracking-tight text-white leading-none">
-              {appName}
+              {companyName || 'Zozomen'}
             </h1>
             <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] mt-1 block">
               {title}

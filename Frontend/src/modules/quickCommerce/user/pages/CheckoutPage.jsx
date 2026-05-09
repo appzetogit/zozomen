@@ -461,7 +461,7 @@ const CheckoutPage = () => {
             sublabel: "UPI / Cards / NetBanking",
           },
         ]),
-    ...(settings?.codEnabled === false
+    ...(settings?.codEnabled === false || userProfile?.isCodAllowed === false
       ? []
       : [
           {

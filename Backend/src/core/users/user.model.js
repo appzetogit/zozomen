@@ -130,6 +130,11 @@ const userSchema = new mongoose.Schema(
             default: true,
             index: true
         },
+        isCodAllowed: {
+            type: Boolean,
+            default: true,
+            index: true
+        },
         role: {
             type: String,
             default: 'USER'

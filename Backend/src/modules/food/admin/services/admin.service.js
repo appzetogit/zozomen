@@ -1238,7 +1238,7 @@ export async function getCustomers(query = {}) {
             .sort(sort)
             .skip(skip)
             .limit(limit)
-            .select('name email phone countryCode isVerified isActive createdAt profileImage')
+            .select('name email phone countryCode isVerified isActive isCodAllowed createdAt profileImage')
             .lean(),
         FoodUser.countDocuments(filter)
     ]);
@@ -1290,6 +1290,7 @@ export async function getCustomers(query = {}) {
         countryCode: u.countryCode || '+91',
         status: u.isActive !== false,
         isActive: u.isActive !== false,
+        isCodAllowed: u.isCodAllowed !== false,
         isVerified: u.isVerified === true,
         totalOrder: stats.totalOrder,
         totalOrderAmount: stats.totalOrderAmount,
@@ -1343,6 +1344,7 @@ export async function getCustomerById(id) {
         countryCode: u.countryCode || '+91',
         status: u.isActive !== false,
         isActive: u.isActive !== false,
+        isCodAllowed: u.isCodAllowed !== false,
         isVerified: u.isVerified === true,
         totalOrders: Number(stats.totalOrders || 0),
         totalOrder: Number(stats.totalOrders || 0),
@@ -1373,6 +1375,58 @@ export async function updateCustomerStatus(id, isActive) {
         await FoodRefreshToken.deleteMany({ userId: updated._id });
     }
     return updated;
+}
+
+export async function updateCustomerCodAccess(id, isCodAllowed) {
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
+    const customerObjectId = new mongoose.Types.ObjectId(id);
+    const hasFoodOrders = await FoodOrder.exists({
+        userId: customerObjectId,
+        orderType: { $in: FOOD_CUSTOMER_ORDER_TYPES },
+    });
+    if (!hasFoodOrders) return null;
+
+    const updatedDoc = await FoodUser.findByIdAndUpdate(
+        id,
+        { $set: { isCodAllowed: Boolean(isCodAllowed) } },
+        { new: true }
+    );
+    if (!updatedDoc) return null;
+    return updatedDoc.toObject();
+}
+
+export async function bulkUpdateCustomersCodAccess(ids = [], isCodAllowed) {
+    const normalizedIds = Array.from(
+        new Set(
+            (Array.isArray(ids) ? ids : [])
+                .map((id) => String(id || '').trim())
+                .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        )
+    );
+
+    if (!normalizedIds.length) {
+        return { matched: 0, modified: 0 };
+    }
+
+    const objectIds = normalizedIds.map((id) => new mongoose.Types.ObjectId(id));
+    const eligibleIds = await FoodOrder.distinct('userId', {
+        userId: { $in: objectIds },
+        orderType: { $in: FOOD_CUSTOMER_ORDER_TYPES },
+    });
+
+    if (!eligibleIds.length) {
+        return { matched: 0, modified: 0 };
+    }
+
+    const result = await FoodUser.updateMany(
+        { _id: { $in: eligibleIds } },
+        { $set: { isCodAllowed: Boolean(isCodAllowed) } }
+    );
+
+    return {
+        matched: Number(result.matchedCount || 0),
+        modified: Number(result.modifiedCount || 0),
+    };
 }
 
 export async function getSupportTickets(query = {}) {

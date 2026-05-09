@@ -70,7 +70,14 @@ import {
 } from "lucide-react"
 import { cn } from "@food/utils/utils"
 import { Input } from "@food/components/ui/input"
-import { getCachedSettings, loadBusinessSettings } from "@common/utils/businessSettings"
+import { 
+  getCachedSettings, 
+  loadBusinessSettings,
+  getCompanyName,
+  getAppLogo,
+  getAppFavicon,
+  updateBrowserFavicon
+} from "@common/utils/businessSettings"
 import { adminAPI } from "@food/api"
 
 const debugLog = (...args) => {}
@@ -179,8 +186,8 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
     if (l.includes("join request") || p.includes("join-request")) return badges.deliveryPartners
     return 0
   }
-  const [logoUrl, setLogoUrl] = useState(() => getCachedSettings()?.logo?.url || null)
-  const [companyName, setCompanyName] = useState(() => getCachedSettings()?.companyName || null)
+  const [logoUrl, setLogoUrl] = useState(() => getAppLogo('admin'))
+  const [companyName, setCompanyName] = useState(() => getCompanyName())
 
   // Load business settings logo
   useEffect(() => {
@@ -189,8 +196,13 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
         // First check cache
         let cached = getCachedSettings()
         if (cached) {
-          if (cached.logo?.url) {
-            setLogoUrl(cached.logo.url)
+          const adminLogo = getAppLogo('admin')
+          if (adminLogo) {
+            setLogoUrl(adminLogo)
+          }
+          const adminFav = getAppFavicon('admin')
+          if (adminFav) {
+            updateBrowserFavicon(adminFav)
           }
           if (cached.companyName) {
             setCompanyName(cached.companyName)
@@ -200,8 +212,13 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
         // Always try to load fresh data to ensure we have the latest
         const settings = await loadBusinessSettings()
         if (settings) {
-          if (settings.logo?.url) {
-            setLogoUrl(settings.logo.url)
+          const adminLogo = getAppLogo('admin')
+          if (adminLogo) {
+            setLogoUrl(adminLogo)
+          }
+          const adminFav = getAppFavicon('admin')
+          if (adminFav) {
+            updateBrowserFavicon(adminFav)
           }
           if (settings.companyName) {
             setCompanyName(settings.companyName)
@@ -221,25 +238,30 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
     }, 100)
 
     // Listen for business settings updates
-    const handleSettingsUpdate = () => {
-      const cached = getCachedSettings()
-      if (cached) {
-        if (cached.logo?.url) {
-          setLogoUrl(cached.logo.url)
+    const handleUpdate = (e) => {
+      const settings = e?.detail || getCachedSettings()
+      if (settings) {
+        const adminLogo = getAppLogo('admin')
+        if (adminLogo) {
+          setLogoUrl(adminLogo)
         }
-        if (cached.companyName) {
-          setCompanyName(cached.companyName)
+        const adminFav = getAppFavicon('admin')
+        if (adminFav) {
+          updateBrowserFavicon(adminFav)
         }
-        if (cached.modules) {
-          setEnabledModules(cached.modules)
+        if (settings.companyName) {
+          setCompanyName(settings.companyName)
+        }
+        if (settings.modules) {
+          setEnabledModules(settings.modules)
         }
       }
     }
-    window.addEventListener('businessSettingsUpdated', handleSettingsUpdate)
+    window.addEventListener('businessSettingsUpdated', handleUpdate)
 
     return () => {
       clearTimeout(timeoutId)
-      window.removeEventListener('businessSettingsUpdated', handleSettingsUpdate)
+      window.removeEventListener('businessSettingsUpdated', handleUpdate)
     }
   }, [])
 

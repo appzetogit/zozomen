@@ -22,6 +22,9 @@ import { FoodTransaction } from '../models/foodTransaction.model.js';
 import { FoodSupportTicket } from '../../user/models/supportTicket.model.js';
 import { Seller } from '../../../quick-commerce/seller/models/seller.model.js';
 import { SellerOrder } from '../../../quick-commerce/seller/models/sellerOrder.model.js';
+import { getSellerCommissionSnapshot } from '../../../quick-commerce/admin/services/commission.service.js';
+import { QuickFeeSettings } from '../../../quick-commerce/admin/models/feeSettings.model.js';
+import { calculateQuickPricing, calculateDeliveryFeeFromSettings } from '../../../quick-commerce/admin/services/billing.service.js';
 import {
     createRazorpayOrder,
     createPaymentLink,
@@ -966,55 +969,72 @@ function buildSellerOrdersFromParent(orderDoc, { customerName = "", customerPhon
     sellerBuckets.get(sellerId).push(item);
   }
 
-  return Array.from(sellerBuckets.entries()).map(([sellerId, sellerItems]) => {
-    const sellerSubtotal = sellerItems.reduce(
-      (sum, item) => sum + Number(item?.price || 0) * Number(item?.quantity || 0),
-      0,
-    );
-    const allocatedDeliveryFee =
-      quickSubtotal > 0
-        ? Number(((totalDeliveryFee * sellerSubtotal) / quickSubtotal).toFixed(2))
-        : 0;
+  return Promise.all(
+    Array.from(sellerBuckets.entries()).map(async ([sellerId, sellerItems]) => {
+      const sellerSubtotal = sellerItems.reduce(
+        (sum, item) => sum + Number(item?.price || 0) * Number(item?.quantity || 0),
+        0,
+      );
+      const allocatedDeliveryFee =
+        quickSubtotal > 0
+          ? Number(((totalDeliveryFee * sellerSubtotal) / quickSubtotal).toFixed(2))
+          : 0;
 
-    return {
-      orderType: order.orderType === "mixed" ? "mixed" : "quick",
-      parentOrderId: orderDoc?._id || order?._id || null,
-      sellerId: new mongoose.Types.ObjectId(sellerId),
-      orderId: order.orderId,
-      customer: {
-        name:
-          String(customerName || order?.userId?.name || "").trim() || "Customer",
-        phone:
-          String(customerPhone || order?.deliveryAddress?.phone || "").trim() || "",
-      },
-      items: sellerItems.map((item) => ({
-        productId: mongoose.isValidObjectId(String(item?.itemId || ""))
-          ? new mongoose.Types.ObjectId(String(item.itemId))
-          : null,
-        name: item?.name || "Item",
-        price: Number(item?.price || 0),
-        quantity: Math.max(1, Number(item?.quantity || 1)),
-        image: item?.image || "",
-      })),
-      pricing: {
-        subtotal: sellerSubtotal,
-        total: sellerSubtotal + allocatedDeliveryFee,
-      },
-      status: "pending",
-      workflowStatus: "SELLER_PENDING",
-      sellerPendingExpiresAt: new Date(Date.now() + 2 * 60 * 1000),
-      address: buildSellerOrderAddress(order.deliveryAddress),
-      payment: {
-        method: ["cash", "cod"].includes(String(order?.payment?.method || "").toLowerCase())
-          ? "cash"
-          : "online",
-      },
-    };
-  });
+      // Phase 2: Calculate commission and receivable for sellers
+      let commissionAmount = 0;
+      let receivable = sellerSubtotal;
+
+      try {
+        const snapshot = await getSellerCommissionSnapshot(sellerId, sellerSubtotal);
+        commissionAmount = Number(snapshot?.commissionAmount || 0);
+        receivable = Math.max(0, Number((sellerSubtotal - commissionAmount).toFixed(2)));
+      } catch (err) {
+        logger.warn(`Failed to get commission snapshot for seller ${sellerId}: ${err.message}`);
+      }
+
+      return {
+        orderType: order.orderType === "mixed" ? "mixed" : "quick",
+        parentOrderId: orderDoc?._id || order?._id || null,
+        sellerId: new mongoose.Types.ObjectId(sellerId),
+        orderId: order.orderId,
+        customer: {
+          name:
+            String(customerName || order?.userId?.name || "").trim() || "Customer",
+          phone:
+            String(customerPhone || order?.deliveryAddress?.phone || "").trim() || "",
+        },
+        items: sellerItems.map((item) => ({
+          productId: mongoose.isValidObjectId(String(item?.itemId || ""))
+            ? new mongoose.Types.ObjectId(String(item.itemId))
+            : null,
+          name: item?.name || "Item",
+          price: Number(item?.price || 0),
+          quantity: Math.max(1, Number(item?.quantity || 1)),
+          image: item?.image || "",
+        })),
+        pricing: {
+          subtotal: sellerSubtotal,
+          deliveryFee: allocatedDeliveryFee,
+          commission: commissionAmount,
+          receivable: receivable,
+          total: Number((sellerSubtotal + allocatedDeliveryFee).toFixed(2)),
+        },
+        status: "pending",
+        workflowStatus: "SELLER_PENDING",
+        sellerPendingExpiresAt: new Date(Date.now() + 2 * 60 * 1000),
+        address: buildSellerOrderAddress(order.deliveryAddress),
+        payment: {
+          method: ["cash", "cod"].includes(String(order?.payment?.method || "").toLowerCase())
+            ? "cash"
+            : "online",
+        },
+      };
+    }),
+  );
 }
 
 async function upsertSellerOrdersForParent(orderDoc, options = {}) {
-  const sellerOrders = buildSellerOrdersFromParent(orderDoc, options);
+  const sellerOrders = await buildSellerOrdersFromParent(orderDoc, options);
   if (!sellerOrders.length) return [];
 
   return Promise.all(
@@ -1638,11 +1658,27 @@ export async function calculateOrder(userId, dto) {
     }
   }
 
-  const gstRate = feeSettings.gstRate;
-  const tax =
-    Number.isFinite(gstRate) && gstRate > 0
+  const quickFeeDoc = (orderType === "mixed")
+    ? await QuickFeeSettings.findOne({ isActive: true }).sort({ createdAt: -1 }).lean()
+    : null;
+
+  const quickSubtotal = orderType === "mixed"
+    ? items.filter(i => i.type === "quick").reduce((s, i) => s + (Number(i.price) * Number(i.quantity)), 0)
+    : 0;
+
+  let tax = 0;
+  if (orderType === "mixed") {
+    const foodSubtotal = items.filter(i => i.type === "food").reduce((s, i) => s + (Number(i.price) * Number(i.quantity)), 0);
+    const foodTax = Math.round(foodSubtotal * (feeSettings.gstRate / 100));
+    const quickGstRate = quickFeeDoc?.gstRate ?? 0;
+    const quickTax = Math.round(quickSubtotal * (quickGstRate / 100));
+    tax = foodTax + quickTax;
+  } else {
+    const gstRate = feeSettings.gstRate;
+    tax = Number.isFinite(gstRate) && gstRate > 0
       ? Math.round(subtotal * (gstRate / 100))
       : 0;
+  }
 
   let discount = 0;
   let appliedCoupon = null;
@@ -1717,7 +1753,7 @@ export async function calculateOrder(userId, dto) {
     }
   }
   const quickDeliveryFee = orderType === "mixed"
-    ? Number(feeSettings.deliveryFee || 25)
+    ? calculateDeliveryFeeFromSettings(quickSubtotal, quickFeeDoc || undefined)
     : 0;
   const normalDeliveryFee =
     orderType === "mixed" ? Math.max(deliveryFee, quickDeliveryFee) : deliveryFee;

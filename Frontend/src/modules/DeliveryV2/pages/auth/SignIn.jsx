@@ -10,6 +10,12 @@ import {
 import { deliveryAPI } from "@food/api"
 import { clearModuleAuth } from "@food/utils/auth"
 import { useCompanyName } from "@food/hooks/useCompanyName"
+import {
+  loadBusinessSettings,
+  getCachedSettings,
+  getAppFavicon,
+  updateBrowserFavicon,
+} from "@common/utils/businessSettings"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -48,6 +54,38 @@ export default function DeliverySignIn() {
       } catch (err) {
         debugError("Error parsing stored auth data:", err)
       }
+    }
+  }, [])
+
+  useEffect(() => {
+    const applyDeliveryBranding = () => {
+      const deliveryFavicon = getAppFavicon("delivery")
+      if (deliveryFavicon) {
+        updateBrowserFavicon(deliveryFavicon)
+      }
+    }
+
+    const cached = getCachedSettings()
+    if (cached) {
+      applyDeliveryBranding()
+    } else {
+      loadBusinessSettings().then(() => {
+        applyDeliveryBranding()
+      })
+    }
+
+    const handleSettingsUpdate = (event) => {
+      const settings = event?.detail
+      if (!settings) return
+      const favicon = settings.deliveryFavicon?.url || settings.favicon?.url || ""
+      if (favicon) {
+        updateBrowserFavicon(favicon)
+      }
+    }
+
+    window.addEventListener("businessSettingsUpdated", handleSettingsUpdate)
+    return () => {
+      window.removeEventListener("businessSettingsUpdated", handleSettingsUpdate)
     }
   }, [])
   const [error, setError] = useState("")
@@ -152,7 +190,6 @@ export default function DeliverySignIn() {
     <div className="max-h-screen h-screen bg-white flex flex-col">
       {/* Top Section - Logo and Badge */}
       <div className="flex flex-col items-center pt-8 pb-6 px-6">
-        {/* Appzeto Logo */}
         <div>
           <h1 className="text-3xl text-black font-extrabold italic lowercase tracking-tight">
             {companyName.toLowerCase()}

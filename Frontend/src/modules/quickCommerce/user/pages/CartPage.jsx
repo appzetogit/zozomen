@@ -114,6 +114,7 @@ const CartPage = () => {
     DEFAULT_QUICK_BILLING_SETTINGS,
   );
   const [categoryFeeMap, setCategoryFeeMap] = useState({});
+  const [isUserCodAllowed, setIsUserCodAllowed] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -168,6 +169,30 @@ const CartPage = () => {
     };
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    const loadProfile = async () => {
+      try {
+        const response = await customerApi.getProfile();
+        const profile =
+          response?.data?.result ||
+          response?.data?.data ||
+          response?.data?.user ||
+          null;
+        if (!mounted || !profile) return;
+        setIsUserCodAllowed(profile.isCodAllowed !== false);
+      } catch (error) {
+        if (mounted) {
+          setIsUserCodAllowed(true);
+        }
+      }
+    };
+    void loadProfile();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const handleClearAll = async () => {
     setShowClearConfirm(false);
     await clearCart();
@@ -195,7 +220,7 @@ const CartPage = () => {
             sublabel: "UPI / Cards / NetBanking",
           },
         ]),
-    ...(settings?.codEnabled === false
+    ...(settings?.codEnabled === false || !isUserCodAllowed
       ? []
       : [
           {

@@ -141,6 +141,56 @@ export const getCachedSettings = () => {
 };
 
 /**
+ * Get app specific logo with fallback to common logo
+ */
+export const getAppLogo = (appType) => {
+  const settings = getCachedSettings();
+  if (!settings) return null;
+  
+  switch(appType) {
+    case 'admin': return settings.adminLogo?.url || settings.logo?.url;
+    case 'user': return settings.userLogo?.url || settings.logo?.url;
+    case 'delivery': return settings.deliveryLogo?.url || settings.logo?.url;
+    case 'restaurant': return settings.restaurantLogo?.url || settings.logo?.url;
+    case 'seller': return settings.sellerLogo?.url || settings.logo?.url;
+    default: return settings.logo?.url;
+  }
+};
+
+/**
+ * Get app specific favicon with fallback to common favicon
+ */
+export const getAppFavicon = (appType) => {
+  const settings = getCachedSettings();
+  if (!settings) return null;
+  
+  switch(appType) {
+    case 'admin': return settings.adminFavicon?.url || settings.favicon?.url;
+    case 'user': return settings.userFavicon?.url || settings.favicon?.url;
+    case 'delivery': return settings.deliveryFavicon?.url || settings.favicon?.url;
+    case 'restaurant': return settings.restaurantFavicon?.url || settings.favicon?.url;
+    case 'seller': return settings.sellerFavicon?.url || settings.favicon?.url;
+    default: return settings.favicon?.url;
+  }
+};
+
+/**
+ * Update browser favicon
+ */
+export const updateBrowserFavicon = (url) => {
+  if (!url) return;
+  const link = document.querySelector("link[rel~='icon']");
+  if (link) {
+    link.href = url;
+  } else {
+    const newLink = document.createElement("link");
+    newLink.rel = "icon";
+    newLink.href = url;
+    document.head.appendChild(newLink);
+  }
+};
+
+/**
  * Get company name from business settings with fallback
  */
 export const getCompanyName = () => {

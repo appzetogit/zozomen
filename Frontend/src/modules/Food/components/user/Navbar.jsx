@@ -12,7 +12,12 @@ import {
 import { useLocation } from "@food/hooks/useLocation"
 import { useCart } from "@food/context/CartContext"
 import { useLocationSelector } from "./UserLayout"
-import { getCachedSettings, loadBusinessSettings } from "@common/utils/businessSettings"
+import { 
+  loadBusinessSettings, 
+  getCachedSettings, 
+  getCompanyName,
+  getAppLogo 
+} from "@common/utils/businessSettings"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -23,50 +28,39 @@ export default function Navbar() {
   const { getCartCount } = useCart()
   const { openLocationSelector } = useLocationSelector()
   const cartCount = getCartCount()
-  const [logoUrl, setLogoUrl] = useState(() => getCachedSettings()?.logo?.url || null)
-  const [companyName, setCompanyName] = useState(() => getCachedSettings()?.companyName || null)
+  const [logoUrl, setLogoUrl] = useState(() => getAppLogo('user'))
+  const [companyName, setCompanyName] = useState(() => getCompanyName())
 
   // Load business settings logo
   useEffect(() => {
-    const loadLogo = async () => {
+    const loadSettings = async () => {
       try {
         const cached = getCachedSettings()
         if (cached) {
-          if (cached.logo?.url) {
-            setLogoUrl(cached.logo.url)
-          }
-          if (cached.companyName) {
-            setCompanyName(cached.companyName)
-          }
+          const userLogo = getAppLogo('user')
+          if (userLogo) setLogoUrl(userLogo)
+          if (cached.companyName) setCompanyName(cached.companyName)
         } else {
           const settings = await loadBusinessSettings()
           if (settings) {
-            if (settings.logo?.url) {
-              setLogoUrl(settings.logo.url)
-            }
-            if (settings.companyName) {
-              setCompanyName(settings.companyName)
-            }
+            const userLogo = getAppLogo('user')
+            if (userLogo) setLogoUrl(userLogo)
+            if (settings.companyName) setCompanyName(settings.companyName)
           }
         }
       } catch (error) {
-        debugError('Error loading logo:', error)
+        debugError('Error loading business settings:', error)
       }
     }
-    loadLogo()
+    loadSettings()
 
     // Listen for business settings updates
-        const handleSettingsUpdate = () => {
-            const cached = getCachedSettings()
-            if (cached) {
-                if (cached.logo?.url) {
-                    setLogoUrl(cached.logo.url)
-                }
-                if (cached.companyName) {
-                    setCompanyName(cached.companyName)
-                }
-            }
-        }
+    const handleSettingsUpdate = (e) => {
+      const settings = e.detail || getCachedSettings();
+      const userLogo = getAppLogo('user');
+      if (userLogo) setLogoUrl(userLogo);
+      if (settings?.companyName) setCompanyName(settings.companyName);
+    };
     window.addEventListener('businessSettingsUpdated', handleSettingsUpdate)
 
     return () => {

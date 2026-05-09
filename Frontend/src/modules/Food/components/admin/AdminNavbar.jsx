@@ -43,7 +43,12 @@ import {
 
 import { adminAPI } from "@food/api";
 import { clearModuleAuth } from "@food/utils/auth";
-import { getCachedSettings, loadBusinessSettings } from "@common/utils/businessSettings";
+import { 
+  loadBusinessSettings, 
+  getCachedSettings, 
+  getCompanyName,
+  getAppLogo 
+} from "@common/utils/businessSettings";
 import useAdminNotifications from "@food/hooks/useAdminNotifications";
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
@@ -59,7 +64,8 @@ export default function AdminNavbar({ onMenuClick }) {
   const [recentSearches, setRecentSearches] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [adminData, setAdminData] = useState(null);
-  const [businessSettings, setBusinessSettings] = useState(() => getCachedSettings() || null);
+  const [logoUrl, setLogoUrl] = useState(() => getAppLogo('admin'));
+  const [companyName, setCompanyName] = useState(() => getCompanyName());
   const searchInputRef = useRef(null);
   const { items: adminNotifications } = useAdminNotifications();
 
@@ -69,11 +75,15 @@ export default function AdminNavbar({ onMenuClick }) {
       try {
         const cached = getCachedSettings();
         if (cached) {
-          setBusinessSettings(cached);
+          const adminLogo = getAppLogo('admin');
+          if (adminLogo) setLogoUrl(adminLogo);
+          setCompanyName(getCompanyName());
         } else {
           const settings = await loadBusinessSettings();
           if (settings) {
-            setBusinessSettings(settings);
+            const adminLogo = getAppLogo('admin');
+            if (adminLogo) setLogoUrl(adminLogo);
+            setCompanyName(getCompanyName());
           }
         }
       } catch (error) {
@@ -83,10 +93,12 @@ export default function AdminNavbar({ onMenuClick }) {
     loadSettings();
 
     // Listen for business settings updates
-    const handleSettingsUpdate = () => {
-      const settings = getCachedSettings();
+    const handleSettingsUpdate = (e) => {
+      const settings = e.detail || getCachedSettings();
       if (settings) {
-        setBusinessSettings(settings);
+        const adminLogo = getAppLogo('admin');
+        if (adminLogo) setLogoUrl(adminLogo);
+        setCompanyName(getCompanyName());
       }
     };
     window.addEventListener('businessSettingsUpdated', handleSettingsUpdate);
@@ -281,10 +293,10 @@ export default function AdminNavbar({ onMenuClick }) {
             {/* Logo */}
             <div className="flex items-center gap-2">
               <div className="w-24 h-12 rounded-lg bg-white flex items-center justify-center ring-neutral-200">
-                {businessSettings?.logo?.url ? (
+                {logoUrl ? (
                   <img
-                    src={businessSettings.logo.url}
-                    alt={businessSettings.companyName || "Company"}
+                    src={logoUrl}
+                    alt={companyName || "Company"}
                     className="w-24 h-10 object-contain"
                     loading="lazy"
                     onError={(e) => {
@@ -293,7 +305,7 @@ export default function AdminNavbar({ onMenuClick }) {
                   />
                 ) : (
                   <span className="text-sm font-semibold text-neutral-700 px-2 truncate">
-                    {businessSettings?.companyName || "Appzeto"}
+                    {companyName || "Appzeto"}
                   </span>
                 )}
               </div>

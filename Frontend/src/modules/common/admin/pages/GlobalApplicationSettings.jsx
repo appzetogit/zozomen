@@ -96,9 +96,37 @@ const ImageUploadBox = ({ title, size, preview, onUpload, onClear }) => {
 const GlobalApplicationSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  
+  // Logos & Favicons state
+  const [adminLogoPreview, setAdminLogoPreview] = useState(null);
+  const [adminLogoFile, setAdminLogoFile] = useState(null);
+  const [adminFaviconPreview, setAdminFaviconPreview] = useState(null);
+  const [adminFaviconFile, setAdminFaviconFile] = useState(null);
+
+  const [userLogoPreview, setUserLogoPreview] = useState(null);
+  const [userLogoFile, setUserLogoFile] = useState(null);
+  const [userFaviconPreview, setUserFaviconPreview] = useState(null);
+  const [userFaviconFile, setUserFaviconFile] = useState(null);
+
+  const [deliveryLogoPreview, setDeliveryLogoPreview] = useState(null);
+  const [deliveryLogoFile, setDeliveryLogoFile] = useState(null);
+  const [deliveryFaviconPreview, setDeliveryFaviconPreview] = useState(null);
+  const [deliveryFaviconFile, setDeliveryFaviconFile] = useState(null);
+
+  const [restaurantLogoPreview, setRestaurantLogoPreview] = useState(null);
+  const [restaurantLogoFile, setRestaurantLogoFile] = useState(null);
+  const [restaurantFaviconPreview, setRestaurantFaviconPreview] = useState(null);
+  const [restaurantFaviconFile, setRestaurantFaviconFile] = useState(null);
+
+  const [sellerLogoPreview, setSellerLogoPreview] = useState(null);
+  const [sellerLogoFile, setSellerLogoFile] = useState(null);
+  const [sellerFaviconPreview, setSellerFaviconPreview] = useState(null);
+  const [sellerFaviconFile, setSellerFaviconFile] = useState(null);
+
+  // Hidden original logo/favicon state to maintain compatibility with backend logic if needed
   const [logoPreview, setLogoPreview] = useState(null);
-  const [faviconPreview, setFaviconPreview] = useState(null);
   const [logoFile, setLogoFile] = useState(null);
+  const [faviconPreview, setFaviconPreview] = useState(null);
   const [faviconFile, setFaviconFile] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -126,6 +154,21 @@ const GlobalApplicationSettings = () => {
 
         if (settings.logo?.url) setLogoPreview(settings.logo.url);
         if (settings.favicon?.url) setFaviconPreview(settings.favicon.url);
+
+        if (settings.adminLogo?.url) setAdminLogoPreview(settings.adminLogo.url);
+        if (settings.adminFavicon?.url) setAdminFaviconPreview(settings.adminFavicon.url);
+
+        if (settings.userLogo?.url) setUserLogoPreview(settings.userLogo.url);
+        if (settings.userFavicon?.url) setUserFaviconPreview(settings.userFavicon.url);
+
+        if (settings.deliveryLogo?.url) setDeliveryLogoPreview(settings.deliveryLogo.url);
+        if (settings.deliveryFavicon?.url) setDeliveryFaviconPreview(settings.deliveryFavicon.url);
+
+        if (settings.restaurantLogo?.url) setRestaurantLogoPreview(settings.restaurantLogo.url);
+        if (settings.restaurantFavicon?.url) setRestaurantFaviconPreview(settings.restaurantFavicon.url);
+
+        if (settings.sellerLogo?.url) setSellerLogoPreview(settings.sellerLogo.url);
+        if (settings.sellerFavicon?.url) setSellerFaviconPreview(settings.sellerFavicon.url);
       }
     } catch (err) {
       console.error('Fetch error:', err);
@@ -165,6 +208,21 @@ const GlobalApplicationSettings = () => {
       if (logoFile) files.logo = logoFile;
       if (faviconFile) files.favicon = faviconFile;
 
+      if (adminLogoFile) files.adminLogo = adminLogoFile;
+      if (adminFaviconFile) files.adminFavicon = adminFaviconFile;
+
+      if (userLogoFile) files.userLogo = userLogoFile;
+      if (userFaviconFile) files.userFavicon = userFaviconFile;
+
+      if (deliveryLogoFile) files.deliveryLogo = deliveryLogoFile;
+      if (deliveryFaviconFile) files.deliveryFavicon = deliveryFaviconFile;
+
+      if (restaurantLogoFile) files.restaurantLogo = restaurantLogoFile;
+      if (restaurantFaviconFile) files.restaurantFavicon = restaurantFaviconFile;
+
+      if (sellerLogoFile) files.sellerLogo = sellerLogoFile;
+      if (sellerFaviconFile) files.sellerFavicon = sellerFaviconFile;
+
       const response = await adminAPI.updateBusinessSettings(dataToSend, files);
       const updatedSettings = response?.data?.data || response?.data;
 
@@ -179,19 +237,12 @@ const GlobalApplicationSettings = () => {
     }
   };
 
-  const handleLogoUpload = async (file) => {
+  const handleFileUpload = async (file, setFile, setPreview) => {
     const compressed = await compressImage(file);
-    setLogoFile(compressed);
+    setFile(compressed);
     const reader = new FileReader();
-    reader.onload = () => setLogoPreview(String(reader.result || ''));
+    reader.onload = () => setPreview(String(reader.result || ''));
     reader.readAsDataURL(compressed);
-  };
-
-  const handleFaviconUpload = (file) => {
-    setFaviconFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setFaviconPreview(String(reader.result || ''));
-    reader.readAsDataURL(file);
   };
 
   if (loading) {
@@ -228,11 +279,39 @@ const GlobalApplicationSettings = () => {
            </div>
         </SectionCard>
 
-        {/* Media Assets */}
-        <SectionCard title="Image Section">
+        {/* Individual App Assets */}
+        <SectionCard title="Admin Application">
            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-              <ImageUploadBox title="Brand Logo" size="750px x 100px" preview={logoPreview} onUpload={handleLogoUpload} onClear={() => { setLogoPreview(null); setLogoFile(null); }} />
-              <ImageUploadBox title="Favicon" size="80px x 80px" preview={faviconPreview} onUpload={handleFaviconUpload} onClear={() => { setFaviconPreview(null); setFaviconFile(null); }} />
+              <ImageUploadBox title="Admin Logo" size="200px x 50px" preview={adminLogoPreview} onUpload={(file) => handleFileUpload(file, setAdminLogoFile, setAdminLogoPreview)} onClear={() => { setAdminLogoPreview(null); setAdminLogoFile(null); }} />
+              <ImageUploadBox title="Admin Favicon" size="80px x 80px" preview={adminFaviconPreview} onUpload={(file) => handleFileUpload(file, setAdminFaviconFile, setAdminFaviconPreview)} onClear={() => { setAdminFaviconPreview(null); setAdminFaviconFile(null); }} />
+           </div>
+        </SectionCard>
+
+        <SectionCard title="User Application">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <ImageUploadBox title="User Logo" size="200px x 50px" preview={userLogoPreview} onUpload={(file) => handleFileUpload(file, setUserLogoFile, setUserLogoPreview)} onClear={() => { setUserLogoPreview(null); setUserLogoFile(null); }} />
+              <ImageUploadBox title="User Favicon" size="80px x 80px" preview={userFaviconPreview} onUpload={(file) => handleFileUpload(file, setUserFaviconFile, setUserFaviconPreview)} onClear={() => { setUserFaviconPreview(null); setUserFaviconFile(null); }} />
+           </div>
+        </SectionCard>
+
+        <SectionCard title="Delivery Application">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <ImageUploadBox title="Delivery Logo" size="200px x 50px" preview={deliveryLogoPreview} onUpload={(file) => handleFileUpload(file, setDeliveryLogoFile, setDeliveryLogoPreview)} onClear={() => { setDeliveryLogoPreview(null); setDeliveryLogoFile(null); }} />
+              <ImageUploadBox title="Delivery Favicon" size="80px x 80px" preview={deliveryFaviconPreview} onUpload={(file) => handleFileUpload(file, setDeliveryFaviconFile, setDeliveryFaviconPreview)} onClear={() => { setDeliveryFaviconPreview(null); setDeliveryFaviconFile(null); }} />
+           </div>
+        </SectionCard>
+
+        <SectionCard title="Restaurant Application">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <ImageUploadBox title="Restaurant Logo" size="200px x 50px" preview={restaurantLogoPreview} onUpload={(file) => handleFileUpload(file, setRestaurantLogoFile, setRestaurantLogoPreview)} onClear={() => { setRestaurantLogoPreview(null); setRestaurantLogoFile(null); }} />
+              <ImageUploadBox title="Restaurant Favicon" size="80px x 80px" preview={restaurantFaviconPreview} onUpload={(file) => handleFileUpload(file, setRestaurantFaviconFile, setRestaurantFaviconPreview)} onClear={() => { setRestaurantFaviconPreview(null); setRestaurantFaviconFile(null); }} />
+           </div>
+        </SectionCard>
+
+        <SectionCard title="Seller Application">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <ImageUploadBox title="Seller Logo" size="200px x 50px" preview={sellerLogoPreview} onUpload={(file) => handleFileUpload(file, setSellerLogoFile, setSellerLogoPreview)} onClear={() => { setSellerLogoPreview(null); setSellerLogoFile(null); }} />
+              <ImageUploadBox title="Seller Favicon" size="80px x 80px" preview={sellerFaviconPreview} onUpload={(file) => handleFileUpload(file, setSellerFaviconFile, setSellerFaviconPreview)} onClear={() => { setSellerFaviconPreview(null); setSellerFaviconFile(null); }} />
            </div>
         </SectionCard>
 

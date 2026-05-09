@@ -2,7 +2,14 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Search, Menu, ChevronRight, MapPin, X, Bell } from "lucide-react"
 import { restaurantAPI } from "@food/api"
-import { getCachedSettings, loadBusinessSettings } from "@common/utils/businessSettings"
+import { 
+  loadBusinessSettings, 
+  getCachedSettings, 
+  getCompanyName,
+  getAppLogo,
+  getAppFavicon,
+  updateBrowserFavicon 
+} from "@common/utils/businessSettings"
 import useNotificationInbox from "@food/hooks/useNotificationInbox"
 
 const debugLog = (...args) => {}
@@ -31,32 +38,45 @@ export default function RestaurantNavbar({
   const [status, setStatus] = useState("Offline")
   const [restaurantData, setRestaurantData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [companyName, setCompanyName] = useState("")
-  const [logoUrl, setLogoUrl] = useState(null)
+  const [companyName, setCompanyName] = useState(() => getCompanyName())
+  const [logoUrl, setLogoUrl] = useState(() => getAppLogo('restaurant'))
   const { unreadCount } = useNotificationInbox("restaurant", { limit: 20, pollMs: 5 * 60 * 1000 })
 
   // Load business settings for branding
   useEffect(() => {
     const loadSettings = async () => {
-      const cached = getCachedSettings()
-      if (cached) {
-        if (cached.companyName) setCompanyName(cached.companyName)
-        if (cached.logo?.url) setLogoUrl(cached.logo.url)
-      } else {
-        const settings = await loadBusinessSettings()
-        if (settings) {
-          if (settings.companyName) setCompanyName(settings.companyName)
-          if (settings.logo?.url) setLogoUrl(settings.logo.url)
+      try {
+        const cached = getCachedSettings()
+        if (cached) {
+          const restLogo = getAppLogo('restaurant')
+          if (restLogo) setLogoUrl(restLogo)
+          const restFav = getAppFavicon('restaurant')
+          if (restFav) updateBrowserFavicon(restFav)
+          if (cached.companyName) setCompanyName(cached.companyName)
+        } else {
+          const settings = await loadBusinessSettings()
+          if (settings) {
+            const restLogo = getAppLogo('restaurant')
+            if (restLogo) setLogoUrl(restLogo)
+            const restFav = getAppFavicon('restaurant')
+            if (restFav) updateBrowserFavicon(restFav)
+            if (settings.companyName) setCompanyName(settings.companyName)
+          }
         }
+      } catch (error) {
+        console.error('Error loading business settings:', error)
       }
     }
     loadSettings()
 
-    const handleSettingsUpdate = () => {
-      const cached = getCachedSettings()
-      if (cached) {
-        if (cached.companyName) setCompanyName(cached.companyName)
-        if (cached.logo?.url) setLogoUrl(cached.logo.url)
+    const handleSettingsUpdate = (e) => {
+      const settings = e.detail || getCachedSettings()
+      if (settings) {
+        const restLogo = settings.restaurantLogo?.url || settings.logo?.url
+        const restFav = settings.restaurantFavicon?.url || settings.favicon?.url
+        if (restLogo) setLogoUrl(restLogo)
+        if (restFav) updateBrowserFavicon(restFav)
+        if (settings.companyName) setCompanyName(settings.companyName)
       }
     }
     window.addEventListener('businessSettingsUpdated', handleSettingsUpdate)

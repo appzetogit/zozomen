@@ -12,7 +12,14 @@ import { FaLocationDot } from "react-icons/fa6"
 import { AnimatePresence, motion } from "framer-motion"
 import { useAuth } from "@core/context/AuthContext"
 
-import { getCachedSettings, loadBusinessSettings } from "@common/utils/businessSettings"
+import { 
+    loadBusinessSettings, 
+    getCachedSettings, 
+    getCompanyName,
+    getAppLogo,
+    getAppFavicon,
+    updateBrowserFavicon 
+} from "@common/utils/businessSettings"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -28,8 +35,8 @@ export default function DesktopNavbar({ showLogo = true }) {
     const { setSearchValue } = useSearchOverlay()
     const { vegMode, setVegMode } = useProfile()
     const [heroSearch, setHeroSearch] = useState("")
-    const [logoUrl, setLogoUrl] = useState(() => getCachedSettings()?.logo?.url || null)
-    const [companyName, setCompanyName] = useState(() => getCachedSettings()?.companyName || null)
+    const [logoUrl, setLogoUrl] = useState(() => getAppLogo('user'))
+    const [companyName, setCompanyName] = useState(() => getCompanyName())
     const [hasScrolledPastBanner, setHasScrolledPastBanner] = useState(false)
     const navRef = useRef(null)
     const cartCount = getCartCount()
@@ -84,18 +91,24 @@ export default function DesktopNavbar({ showLogo = true }) {
             try {
                 const cached = getCachedSettings()
                 if (cached) {
-                    if (cached.logo?.url) {
-                        setLogoUrl(cached.logo.url)
+                    const userLogo = getAppLogo('user')
+                    if (userLogo) {
+                        setLogoUrl(userLogo)
                     }
+                    const userFav = getAppFavicon('user')
+                    if (userFav) updateBrowserFavicon(userFav)
                     if (cached.companyName) {
                         setCompanyName(cached.companyName)
                     }
                 } else {
                     const settings = await loadBusinessSettings()
                     if (settings) {
-                        if (settings.logo?.url) {
-                            setLogoUrl(settings.logo.url)
+                        const userLogo = getAppLogo('user')
+                        if (userLogo) {
+                            setLogoUrl(userLogo)
                         }
+                        const userFav = getAppFavicon('user')
+                        if (userFav) updateBrowserFavicon(userFav)
                         if (settings.companyName) {
                             setCompanyName(settings.companyName)
                         }
@@ -108,16 +121,13 @@ export default function DesktopNavbar({ showLogo = true }) {
         loadLogo()
 
         // Listen for business settings updates
-        const handleSettingsUpdate = () => {
-            const cached = getCachedSettings()
-            if (cached) {
-                if (cached.logo?.url) {
-                    setLogoUrl(cached.logo.url)
-                }
-                if (cached.companyName) {
-                    setCompanyName(cached.companyName)
-                }
-            }
+        const handleSettingsUpdate = (e) => {
+            const settings = e.detail || getCachedSettings()
+            const userLogo = settings?.userLogo?.url || settings?.logo?.url
+            const userFav = settings?.userFavicon?.url || settings?.favicon?.url
+            if (userLogo) setLogoUrl(userLogo)
+            if (userFav) updateBrowserFavicon(userFav)
+            if (settings?.companyName) setCompanyName(settings.companyName)
         }
         window.addEventListener('businessSettingsUpdated', handleSettingsUpdate)
 

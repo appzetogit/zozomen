@@ -1,7 +1,13 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Loader from "@food/components/Loader";
+import {
+  loadBusinessSettings,
+  getCachedSettings,
+  getAppFavicon,
+  updateBrowserFavicon,
+} from "@common/utils/businessSettings";
 
 // Auth Pages (Lazy loaded)
 const Welcome = lazy(() => import("./pages/auth/Welcome"))
@@ -35,6 +41,22 @@ import NotificationsV2 from './pages/NotificationsV2';
 
 const DeliveryV2Router = () => {
   const location = useLocation();
+
+  useEffect(() => {
+    const applyDeliveryFavicon = () => {
+      const deliveryFavicon = getAppFavicon("delivery");
+      if (deliveryFavicon) {
+        updateBrowserFavicon(deliveryFavicon);
+      }
+    };
+
+    if (getCachedSettings()) {
+      applyDeliveryFavicon();
+    } else {
+      loadBusinessSettings().then(() => applyDeliveryFavicon());
+    }
+  }, []);
+
   return (
     <Suspense fallback={<Loader />}>
       <Routes>

@@ -152,7 +152,36 @@ export async function createInitialTransaction(order) {
         Number.isFinite(restaurantCommissionFromOrder) && restaurantCommissionFromOrder > 0
             ? restaurantCommissionFromOrder
             : (commissionAmount || 0);
-    const restaurantNet = (order.pricing?.subtotal || 0) + (order.pricing?.packagingFee || 0) - restaurantCommission;
+
+    // Phase 3A: Segregated calculations for mixed orders
+    let restaurantNet = 0;
+    let sellerShare = 0;
+    let sellerCommission = 0;
+
+    if (order.orderType === 'mixed') {
+        const foodSubtotal = (order.items || [])
+            .filter(i => i.type === 'food')
+            .reduce((sum, i) => sum + (Number(i.price) * Number(i.quantity)), 0);
+        
+        restaurantNet = foodSubtotal + (order.pricing?.packagingFee || 0) - restaurantCommission;
+
+        // Seller logic (from receivable rules)
+        const quickItems = (order.items || []).filter(i => i.type === 'quick');
+        // Sum commission and receivable if pre-calculated in Phase 2
+        // We'll calculate it here for the ledger based on the items
+        sellerCommission = quickItems.reduce((sum, i) => sum + (Number(i.commission) || 0), 0);
+        sellerShare = quickItems.reduce((sum, i) => sum + (Number(i.receivable) || 0), 0);
+        
+        // If items don't have these (unlikely after Ph2), fallback to simple subtotal
+        if (sellerShare === 0 && quickItems.length > 0) {
+            sellerShare = quickItems.reduce((sum, i) => sum + (Number(i.price) * Number(i.quantity)), 0);
+        }
+    } else {
+        restaurantNet = (order.pricing?.subtotal || 0) + (order.pricing?.packagingFee || 0) - restaurantCommission;
+        sellerShare = 0;
+        sellerCommission = 0;
+    }
+
     const platformNetProfit = (order.pricing?.platformFee || 0) + (order.pricing?.deliveryFee || 0) + restaurantCommission - riderShare;
 
     const transaction = new FoodTransaction({
@@ -196,6 +225,8 @@ export async function createInitialTransaction(order) {
         amounts: {
             totalCustomerPaid,
             restaurantShare: Math.max(0, restaurantNet),
+            sellerShare: Math.max(0, sellerShare),
+            sellerCommission: Math.max(0, sellerCommission),
             restaurantCommission,
             riderShare,
             platformNetProfit,

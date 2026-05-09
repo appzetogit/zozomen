@@ -6,7 +6,12 @@ import { useLocation } from "@food/hooks/useLocation"
 import { useCart } from "@food/context/CartContext"
 import { useLocationSelector } from "./UserLayout"
 import { FaLocationDot } from "react-icons/fa6"
-import { getCachedSettings, loadBusinessSettings } from "@common/utils/businessSettings"
+import { 
+  loadBusinessSettings, 
+  getCachedSettings, 
+  getCompanyName,
+  getAppLogo 
+} from "@common/utils/businessSettings"
 
 
 export default function PageNavbar({
@@ -20,8 +25,8 @@ export default function PageNavbar({
   const { getCartCount } = useCart()
   const { openLocationSelector } = useLocationSelector()
   const cartCount = getCartCount()
-  const [logoUrl, setLogoUrl] = useState(() => getCachedSettings()?.logo?.url || null)
-  const [companyName, setCompanyName] = useState(() => getCachedSettings()?.companyName || null)
+  const [logoUrl, setLogoUrl] = useState(() => getAppLogo('user'))
+  const [companyName, setCompanyName] = useState(() => getCompanyName())
   const autoLocationAttemptedRef = useRef(false)
   const requestLocationRef = useRef(requestLocation)
   const enableLocationDebugLogs = false
@@ -108,54 +113,37 @@ export default function PageNavbar({
 
   // Load business settings logo
   useEffect(() => {
-    const loadLogo = async () => {
+    const loadSettings = async () => {
       try {
-        // First check cache
-        let cached = getCachedSettings()
+        const cached = getCachedSettings()
         if (cached) {
-          if (cached.logo?.url) {
-            setLogoUrl(cached.logo.url)
-          }
-          if (cached.companyName) {
-            setCompanyName(cached.companyName)
-          }
-        }
-
-        // Always try to load fresh data to ensure we have the latest
-        const settings = await loadBusinessSettings()
-        if (settings) {
-          if (settings.logo?.url) {
-            setLogoUrl(settings.logo.url)
-          }
-          if (settings.companyName) {
-            setCompanyName(settings.companyName)
+          const userLogo = getAppLogo('user')
+          if (userLogo) setLogoUrl(userLogo)
+          if (cached.companyName) setCompanyName(cached.companyName)
+        } else {
+          const settings = await loadBusinessSettings()
+          if (settings) {
+            const userLogo = getAppLogo('user')
+            if (userLogo) setLogoUrl(userLogo)
+            if (settings.companyName) setCompanyName(settings.companyName)
           }
         }
       } catch (error) {
-        debugError('Error loading logo:', error)
+        console.error('Error loading business settings:', error)
       }
     }
-
-    // Load immediately
-    loadLogo()
-
-    // Listen for business settings updates
-    const handleSettingsUpdate = () => {
-      const cached = getCachedSettings()
-      if (cached) {
-        if (cached.logo?.url) {
-          setLogoUrl(cached.logo.url)
-        }
-        if (cached.companyName) {
-          setCompanyName(cached.companyName)
-        }
-      }
-    }
-    window.addEventListener('businessSettingsUpdated', handleSettingsUpdate)
-
-    return () => {
-      window.removeEventListener('businessSettingsUpdated', handleSettingsUpdate)
-    }
+    loadSettings()
+    
+    // Listen for updates
+    const handleUpdate = (e) => {
+      const settings = e.detail;
+      const userLogo = settings.userLogo?.url || settings.logo?.url;
+      if (userLogo) setLogoUrl(userLogo);
+      if (settings.companyName) setCompanyName(settings.companyName);
+    };
+    
+    window.addEventListener('businessSettingsUpdated', handleUpdate);
+    return () => window.removeEventListener('businessSettingsUpdated', handleUpdate);
   }, [])
 
   // Function to extract location parts for display

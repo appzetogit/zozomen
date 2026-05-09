@@ -16,6 +16,46 @@ const globalSettingsSchema = new mongoose.Schema(
             url: { type: String, default: '' },
             publicId: { type: String, default: '' }
         },
+        adminLogo: {
+            url: { type: String, default: '' },
+            publicId: { type: String, default: '' }
+        },
+        adminFavicon: {
+            url: { type: String, default: '' },
+            publicId: { type: String, default: '' }
+        },
+        userLogo: {
+            url: { type: String, default: '' },
+            publicId: { type: String, default: '' }
+        },
+        userFavicon: {
+            url: { type: String, default: '' },
+            publicId: { type: String, default: '' }
+        },
+        deliveryLogo: {
+            url: { type: String, default: '' },
+            publicId: { type: String, default: '' }
+        },
+        deliveryFavicon: {
+            url: { type: String, default: '' },
+            publicId: { type: String, default: '' }
+        },
+        restaurantLogo: {
+            url: { type: String, default: '' },
+            publicId: { type: String, default: '' }
+        },
+        restaurantFavicon: {
+            url: { type: String, default: '' },
+            publicId: { type: String, default: '' }
+        },
+        sellerLogo: {
+            url: { type: String, default: '' },
+            publicId: { type: String, default: '' }
+        },
+        sellerFavicon: {
+            url: { type: String, default: '' },
+            publicId: { type: String, default: '' }
+        },
         favicon: {
             url: { type: String, default: '' },
             publicId: { type: String, default: '' }

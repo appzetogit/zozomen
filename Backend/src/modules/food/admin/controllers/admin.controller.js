@@ -48,6 +48,36 @@ export async function updateCustomerStatus(req, res, next) {
     }
 }
 
+export async function updateCustomerCodAccess(req, res, next) {
+    try {
+        const { id } = req.params;
+        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: 'Invalid customer id' });
+        }
+        const isCodAllowed = req.body?.isCodAllowed;
+        const updated = await adminService.updateCustomerCodAccess(id, isCodAllowed);
+        if (!updated) return res.status(404).json({ success: false, message: 'Customer not found' });
+        res.status(200).json({ success: true, message: 'Customer COD access updated successfully', data: { user: updated, customer: updated } });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function bulkUpdateCustomersCodAccess(req, res, next) {
+    try {
+        const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+        const isCodAllowed = req.body?.isCodAllowed;
+        const result = await adminService.bulkUpdateCustomersCodAccess(ids, isCodAllowed);
+        res.status(200).json({
+            success: true,
+            message: 'Bulk customer COD access updated successfully',
+            data: result,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
 // ----- Safety / Emergency Reports -----
 export async function getSafetyEmergencyReports(req, res, next) {
     try {

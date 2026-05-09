@@ -1094,12 +1094,52 @@ export default function Cart() {
   const totalBeforeDiscount = subtotal + deliveryFee + platformFee + gstCharges
   const total = pricing?.total || (totalBeforeDiscount - discount)
   const savings = pricing?.savings ?? Math.max(0, totalBeforeDiscount - total)
+  const isUserCodAllowed = userProfile?.isCodAllowed !== false
+  const paymentOptions = [
+    {
+      id: 'razorpay',
+      name: 'Online Payment',
+      description: 'UPI, Cards, Netbanking',
+      icon: <Zap className="w-5 h-5" />,
+      color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400',
+      selectedColor: 'bg-emerald-500 text-white',
+      badge: 'SECURE'
+    },
+    {
+      id: 'wallet',
+      name: 'Quick Wallet',
+      description: 'Pay from your wallet',
+      icon: <Wallet className="w-5 h-5" />,
+      color: 'bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400',
+      selectedColor: 'bg-blue-500 text-white',
+      subInfo: `Bal: ${RUPEE_SYMBOL}${walletBalance.toFixed(0)}`,
+      disabled: walletBalance < total,
+      disabledText: 'Low Balance'
+    },
+    ...(isUserCodAllowed
+      ? [{
+        id: 'cash',
+        name: 'Cash on Delivery',
+        description: 'Pay when order arrives',
+        icon: <Banknote className="w-5 h-5" />,
+        color: 'bg-orange-50 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400',
+        selectedColor: 'bg-orange-500 text-white'
+      }]
+      : [])
+  ]
   const selectedPaymentLabel =
     selectedPaymentMethod === "wallet"
       ? "Wallet"
       : selectedPaymentMethod === "razorpay"
         ? "Online Payment"
         : "Cash on Delivery"
+
+  useEffect(() => {
+    const hasSelectedPayment = paymentOptions.some((option) => option.id === selectedPaymentMethod)
+    if (!hasSelectedPayment && paymentOptions.length > 0) {
+      setSelectedPaymentMethod(paymentOptions[0].id)
+    }
+  }, [paymentOptions, selectedPaymentMethod])
 
   // Restaurant name from data or cart
   const restaurantName = restaurantData?.name || cart[0]?.restaurant || "Restaurant"
@@ -2992,36 +3032,7 @@ export default function Cart() {
                     </div>
 
                     <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar pb-4 flex-1 min-h-0">
-                      {[
-                        {
-                          id: 'razorpay',
-                          name: 'Online Payment',
-                          description: 'UPI, Cards, Netbanking',
-                          icon: <Zap className="w-5 h-5" />,
-                          color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400',
-                          selectedColor: 'bg-emerald-500 text-white',
-                          badge: 'SECURE'
-                        },
-                        {
-                          id: 'wallet',
-                          name: 'Quick Wallet',
-                          description: 'Pay from your wallet',
-                          icon: <Wallet className="w-5 h-5" />,
-                          color: 'bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400',
-                          selectedColor: 'bg-blue-500 text-white',
-                          subInfo: `Bal: ${RUPEE_SYMBOL}${walletBalance.toFixed(0)}`,
-                          disabled: walletBalance < total,
-                          disabledText: 'Low Balance'
-                        },
-                        {
-                          id: 'cash',
-                          name: 'Cash on Delivery',
-                          description: 'Pay when order arrives',
-                          icon: <Banknote className="w-5 h-5" />,
-                          color: 'bg-orange-50 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400',
-                          selectedColor: 'bg-orange-500 text-white'
-                        }
-                      ].map((option) => (
+                      {paymentOptions.map((option) => (
                         <button
                           key={option.id}
                           onClick={() => {

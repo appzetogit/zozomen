@@ -20,6 +20,9 @@ export default function Customers() {
   const [userDetails, setUserDetails] = useState(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [showUserDetails, setShowUserDetails] = useState(false)
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState([])
+  const [bulkCodLoading, setBulkCodLoading] = useState(false)
+  const [codUpdatingId, setCodUpdatingId] = useState(null)
   const [filters, setFilters] = useState({
     orderDate: "",
     joiningDate: "",
@@ -82,6 +85,12 @@ export default function Customers() {
 
     return result
   }, [customers, searchQuery, filters])
+
+  const getCustomerId = (customer) => customer?._id || customer?.id || customer?.sl || null
+  const selectedCustomersCount = selectedCustomerIds.length
+  const allVisibleSelected =
+    filteredCustomers.length > 0 &&
+    filteredCustomers.every((customer) => selectedCustomerIds.includes(getCustomerId(customer)))
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }))
@@ -189,6 +198,76 @@ export default function Customers() {
       setCustomers(customers.map(c =>
         c.id === customerId ? { ...c, status: !c.status } : c
       ))
+    }
+  }
+
+  const handleToggleCodAccess = async (customerId) => {
+    try {
+      const customer = customers.find((c) => getCustomerId(c) === customerId)
+      if (!customer) return
+      const nextCodAccess = !(customer.isCodAllowed !== false)
+      setCodUpdatingId(customerId)
+
+      setCustomers((prev) =>
+        prev.map((c) =>
+          getCustomerId(c) === customerId ? { ...c, isCodAllowed: nextCodAccess } : c
+        )
+      )
+
+      await adminAPI.updateCustomerCodAccess(customerId, nextCodAccess)
+      toast.success(`COD ${nextCodAccess ? "enabled" : "disabled"} for user`)
+    } catch (error) {
+      debugError("Error updating COD access:", error)
+      toast.error("Failed to update COD access")
+      setCustomers((prev) =>
+        prev.map((c) =>
+          getCustomerId(c) === customerId ? { ...c, isCodAllowed: !(c.isCodAllowed !== false) } : c
+        )
+      )
+    } finally {
+      setCodUpdatingId(null)
+    }
+  }
+
+  const toggleCustomerSelection = (customerId) => {
+    if (!customerId) return
+    setSelectedCustomerIds((prev) =>
+      prev.includes(customerId) ? prev.filter((id) => id !== customerId) : [...prev, customerId]
+    )
+  }
+
+  const toggleSelectAllVisible = () => {
+    if (allVisibleSelected) {
+      const visibleIds = filteredCustomers.map((customer) => getCustomerId(customer)).filter(Boolean)
+      setSelectedCustomerIds((prev) => prev.filter((id) => !visibleIds.includes(id)))
+      return
+    }
+    const visibleIds = filteredCustomers.map((customer) => getCustomerId(customer)).filter(Boolean)
+    setSelectedCustomerIds((prev) => Array.from(new Set([...prev, ...visibleIds])))
+  }
+
+  const handleBulkCodAccess = async (isCodAllowed) => {
+    if (!selectedCustomerIds.length) {
+      toast.error("Please select at least one customer")
+      return
+    }
+    try {
+      setBulkCodLoading(true)
+      await adminAPI.bulkUpdateCustomerCodAccess(selectedCustomerIds, isCodAllowed)
+      setCustomers((prev) =>
+        prev.map((customer) =>
+          selectedCustomerIds.includes(getCustomerId(customer))
+            ? { ...customer, isCodAllowed: isCodAllowed !== false }
+            : customer
+        )
+      )
+      toast.success(`COD ${isCodAllowed ? "enabled" : "disabled"} for selected users`)
+      setSelectedCustomerIds([])
+    } catch (error) {
+      debugError("Error in bulk COD update:", error)
+      toast.error("Failed to update selected users")
+    } finally {
+      setBulkCodLoading(false)
     }
   }
 
@@ -419,17 +498,50 @@ export default function Customers() {
             </div>
           </div>
 
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-sm text-slate-600">
+              {selectedCustomersCount > 0
+                ? `${selectedCustomersCount} customer selected`
+                : "Select customers for bulk COD action"}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleBulkCodAccess(true)}
+                disabled={bulkCodLoading || selectedCustomersCount === 0}
+                className="px-3 py-2 text-xs font-semibold rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Enable COD
+              </button>
+              <button
+                onClick={() => handleBulkCodAccess(false)}
+                disabled={bulkCodLoading || selectedCustomersCount === 0}
+                className="px-3 py-2 text-xs font-semibold rounded-md bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Disable COD
+              </button>
+            </div>
+          </div>
+
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px]">
+            <table className="w-full min-w-[1080px]">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
+                  <th className="px-4 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAllVisible}
+                      className="h-4 w-4 rounded border-slate-300"
+                    />
+                  </th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Sl</th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Name</th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Contact Information</th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Total Order</th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Total Order Amount</th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Joining Date</th>
+                  <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">COD Access</th>
                   <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">Active/Inactive</th>
                   <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -437,19 +549,27 @@ export default function Customers() {
               <tbody className="bg-white divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-8 text-center">
+                    <td colSpan={10} className="px-6 py-8 text-center">
                       <div className="text-sm text-slate-500">Loading customers...</div>
                     </td>
                   </tr>
                 ) : filteredCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-8 text-center">
+                    <td colSpan={10} className="px-6 py-8 text-center">
                       <div className="text-sm text-slate-500">No customers found</div>
                     </td>
                   </tr>
                 ) : (
                   filteredCustomers.map((customer, index) => (
-                    <tr key={customer.id || customer.sl} className="hover:bg-slate-50 transition-colors">
+                    <tr key={getCustomerId(customer) || index} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedCustomerIds.includes(getCustomerId(customer))}
+                          onChange={() => toggleCustomerSelection(getCustomerId(customer))}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm font-medium text-slate-700">{index + 1}</span>
                       </td>
@@ -497,7 +617,20 @@ export default function Customers() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button
-                          onClick={() => handleToggleStatus(customer.id || customer.sl)}
+                          onClick={() => handleToggleCodAccess(getCustomerId(customer))}
+                          disabled={codUpdatingId === getCustomerId(customer)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60 ${customer.isCodAllowed !== false ? "bg-emerald-600" : "bg-slate-300"
+                            }`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${customer.isCodAllowed !== false ? "translate-x-6" : "translate-x-1"
+                              }`}
+                          />
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => handleToggleStatus(getCustomerId(customer))}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${customer.status ? "bg-blue-600" : "bg-slate-300"
                             }`}
                         >

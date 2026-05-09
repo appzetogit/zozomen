@@ -4,7 +4,7 @@ import { uploadImageBufferDetailed } from '../../../services/cloudinary.service.
 
 export async function getGlobalSettings(req, res, next) {
     try {
-        let settings = await GlobalSettings.findOne().lean();
+        let settings = await GlobalSettings.findOne();
         if (!settings) {
             // Create default settings if none exist
             settings = await GlobalSettings.create({
@@ -12,7 +12,21 @@ export async function getGlobalSettings(req, res, next) {
                 email: 'admin@appzeto.com'
             });
         }
-        return sendResponse(res, 200, 'Global settings fetched successfully', settings);
+
+        // Cleanup any extra modules that might be in the DB (taxi, hotel, etc.)
+        const rawSettings = settings.toObject();
+        if (rawSettings.modules) {
+            const allowedModules = ['food', 'quickCommerce'];
+            const cleanedModules = {};
+            allowedModules.forEach(mod => {
+                if (rawSettings.modules[mod] !== undefined) {
+                    cleanedModules[mod] = rawSettings.modules[mod];
+                }
+            });
+            rawSettings.modules = cleanedModules;
+        }
+
+        return sendResponse(res, 200, 'Global settings fetched successfully', rawSettings);
     } catch (error) {
         next(error);
     }
@@ -32,7 +46,11 @@ export async function updateGlobalSettings(req, res, next) {
             data = req.body;
         }
         
-        const { companyName, email, phoneCountryCode, phoneNumber, address, state, pincode, region, logoUrl, faviconUrl, themeColor, modules } = data;
+        const { 
+            companyName, email, phoneCountryCode, phoneNumber, address, state, pincode, region, 
+            logoUrl, adminLogoUrl, adminFaviconUrl, userLogoUrl, userFaviconUrl, deliveryLogoUrl, deliveryFaviconUrl, restaurantLogoUrl, restaurantFaviconUrl, sellerLogoUrl, sellerFaviconUrl,
+            faviconUrl, themeColor, modules 
+        } = data;
         
         console.log("Updating global settings with data:", data);
 
@@ -66,45 +84,62 @@ export async function updateGlobalSettings(req, res, next) {
         if (state !== undefined) settings.state = state;
         if (pincode !== undefined) settings.pincode = pincode;
         if (region) settings.region = region;
-        if (logoUrl !== undefined) {
-            settings.logo = {
-                url: String(logoUrl || '').trim(),
-                publicId: settings.logo?.publicId || ''
-            };
-        }
-        if (faviconUrl !== undefined) {
-            settings.favicon = {
-                url: String(faviconUrl || '').trim(),
-                publicId: settings.favicon?.publicId || ''
-            };
-        }
+
+        // Update URLs if provided
+        const mediaFields = [
+            'logo', 'adminLogo', 'adminFavicon', 'userLogo', 'userFavicon', 
+            'deliveryLogo', 'deliveryFavicon', 'restaurantLogo', 'restaurantFavicon', 
+            'sellerLogo', 'sellerFavicon', 'favicon'
+        ];
+        mediaFields.forEach(field => {
+            const urlKey = `${field}Url`;
+            if (data[urlKey] !== undefined) {
+                settings[field] = {
+                    url: String(data[urlKey] || '').trim(),
+                    publicId: settings[field]?.publicId || ''
+                };
+                settings.markModified(field);
+            }
+        });
         if (themeColor !== undefined) {
             settings.themeColor = themeColor;
         }
-        if (modules !== undefined) {
-            settings.modules = {
-                food: modules.food !== undefined ? modules.food : settings.modules?.food,
 
-                quickCommerce: modules.quickCommerce !== undefined ? modules.quickCommerce : settings.modules?.quickCommerce,
-
-            };
-        }
+        // Strictly define modules and remove unwanted ones like taxi, hotel
+        const currentModules = settings.modules || {};
+        settings.modules = {
+            food: modules?.food !== undefined ? !!modules.food : (currentModules.food !== undefined ? !!currentModules.food : true),
+            quickCommerce: modules?.quickCommerce !== undefined ? !!modules.quickCommerce : (currentModules.quickCommerce !== undefined ? !!currentModules.quickCommerce : true)
+        };
+        // Use markModified to ensure the modules object is fully replaced in DB
+        settings.markModified('modules');
 
         // Handle file uploads
         if (req.files) {
-            if (req.files.logo) {
-                const logoResult = await uploadImageBufferDetailed(req.files.logo[0].buffer, 'business/logos');
-                settings.logo = {
-                    url: logoResult.secure_url,
-                    publicId: logoResult.public_id
-                };
-            }
-            if (req.files.favicon) {
-                const faviconResult = await uploadImageBufferDetailed(req.files.favicon[0].buffer, 'business/favicons');
-                settings.favicon = {
-                    url: faviconResult.secure_url,
-                    publicId: faviconResult.public_id
-                };
+            const mediaUploadFields = [
+                { name: 'logo', folder: 'business/logos' },
+                { name: 'adminLogo', folder: 'business/logos/admin' },
+                { name: 'adminFavicon', folder: 'business/favicons/admin' },
+                { name: 'userLogo', folder: 'business/logos/user' },
+                { name: 'userFavicon', folder: 'business/favicons/user' },
+                { name: 'deliveryLogo', folder: 'business/logos/delivery' },
+                { name: 'deliveryFavicon', folder: 'business/favicons/delivery' },
+                { name: 'restaurantLogo', folder: 'business/logos/restaurant' },
+                { name: 'restaurantFavicon', folder: 'business/favicons/restaurant' },
+                { name: 'sellerLogo', folder: 'business/logos/seller' },
+                { name: 'sellerFavicon', folder: 'business/favicons/seller' },
+                { name: 'favicon', folder: 'business/favicons' }
+            ];
+
+            for (const field of mediaUploadFields) {
+                if (req.files[field.name] && req.files[field.name][0]) {
+                    const result = await uploadImageBufferDetailed(req.files[field.name][0].buffer, field.folder);
+                    settings[field.name] = {
+                        url: result.secure_url,
+                        publicId: result.public_id
+                    };
+                    settings.markModified(field);
+                }
             }
         }
 

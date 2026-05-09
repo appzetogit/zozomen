@@ -542,6 +542,21 @@ export const adminAPI = {
       { isActive: isActive !== false },
       { contextModule: "admin" },
     ),
+  updateCustomerCodAccess: (id, isCodAllowed) =>
+    apiClient.patch(
+      `/food/admin/customers/${String(id)}/cod-access`,
+      { isCodAllowed: isCodAllowed !== false },
+      { contextModule: "admin" },
+    ),
+  bulkUpdateCustomerCodAccess: (ids = [], isCodAllowed) =>
+    apiClient.patch(
+      "/food/admin/customers/cod-access/bulk",
+      {
+        ids: Array.isArray(ids) ? ids : [],
+        isCodAllowed: isCodAllowed !== false,
+      },
+      { contextModule: "admin" },
+    ),
   /** Orders (admin) – list, get by id, assign delivery partner */
   getOrders: (params = {}) =>
     apiClient.get("/food/admin/orders", {
@@ -900,9 +915,18 @@ export const adminAPI = {
     const formData = new FormData();
     // Add JSON data as a string in the 'data' field
     formData.append("data", JSON.stringify(data));
+    
     // Add files with the same names expected by the backend
-    if (files.logo) formData.append("logo", files.logo);
-    if (files.favicon) formData.append("favicon", files.favicon);
+    const fileFields = [
+      'logo', 'adminLogo', 'adminFavicon', 'userLogo', 'userFavicon', 
+      'deliveryLogo', 'deliveryFavicon', 'restaurantLogo', 'restaurantFavicon', 
+      'sellerLogo', 'sellerFavicon', 'favicon'
+    ];
+    fileFields.forEach(field => {
+      if (files[field]) {
+        formData.append(field, files[field]);
+      }
+    });
 
     return apiClient.patch(API_ENDPOINTS.ADMIN.BUSINESS_SETTINGS, formData, {
       contextModule: "admin",
