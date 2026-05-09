@@ -63,6 +63,42 @@ export async function updateCustomerCodAccess(req, res, next) {
     }
 }
 
+export async function updateDeliveryPartnerActiveStatus(req, res, next) {
+    try {
+        const { id } = req.params;
+        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid delivery partner id'
+            });
+        }
+
+        const isActive = req.body?.isActive;
+        if (typeof isActive !== 'boolean') {
+            return res.status(400).json({
+                success: false,
+                message: 'isActive must be a boolean'
+            });
+        }
+
+        const partner = await adminService.updateDeliveryPartnerActiveStatus(id, isActive);
+        if (!partner) {
+            return res.status(404).json({
+                success: false,
+                message: 'Delivery partner not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Delivery partner ${isActive ? 'activated' : 'deactivated'} successfully`,
+            data: partner
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function bulkUpdateCustomersCodAccess(req, res, next) {
     try {
         const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];

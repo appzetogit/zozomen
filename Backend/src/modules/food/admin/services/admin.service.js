@@ -3832,6 +3832,7 @@ export async function getDeliveryPartners(query) {
             zone: detectedZone || doc.city || doc.state || doc.address || 'N/A',
             vehicleType: doc.vehicleType || '',
             status: doc.status,
+            isActive: doc.isActive !== false,
             profilePhoto: doc.profilePhoto || null,
             profileImage: doc.profilePhoto ? { url: doc.profilePhoto } : null,
             totalOrders: countsMap.get(doc._id.toString()) || 0
@@ -4451,6 +4452,7 @@ export async function getDeliveryPartnerById(id) {
         deliveryId,
         detectedZone: detectedZone || partner.city || partner.state || 'N/A',
         status: partner.status === 'rejected' ? 'blocked' : partner.status,
+        isActive: partner.isActive !== false,
         profileImage: partner.profilePhoto ? { url: partner.profilePhoto } : null,
         documents: {
             aadhar: (partner.aadharPhoto || partner.aadharNumber)
@@ -4556,6 +4558,7 @@ export async function approveDeliveryPartner(id) {
     const partner = await FoodDeliveryPartner.findById(id);
     if (!partner) return null;
     partner.status = 'approved';
+    partner.isActive = true;
     partner.approvedAt = new Date();
     partner.rejectedAt = undefined;
     partner.rejectionReason = undefined;
@@ -4644,6 +4647,7 @@ export async function rejectDeliveryPartner(id, reason) {
         {
             $set: {
                 status: 'rejected',
+                isActive: false,
                 rejectedAt: new Date(),
                 rejectionReason: typeof reason === 'string' ? reason.trim() : undefined,
                 approvedAt: null
@@ -4672,6 +4676,34 @@ export async function rejectDeliveryPartner(id, reason) {
             console.error('Failed to send delivery partner rejection notification:', e);
         }
     }
+    return updated;
+}
+
+export async function updateDeliveryPartnerActiveStatus(id, isActive) {
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) return null;
+    const nextIsActive = Boolean(isActive);
+    const update = {
+        isActive: nextIsActive,
+        ...(nextIsActive ? {} : { availabilityStatus: 'offline' }),
+    };
+
+    const updated = await FoodDeliveryPartner.findByIdAndUpdate(
+        id,
+        { $set: update },
+        { new: true },
+    ).lean();
+    if (!updated) return null;
+
+    if (!nextIsActive) {
+        await Promise.all([
+            FoodRefreshToken.deleteMany({ userId: updated._id }),
+            FoodDeliveryPartner.updateOne(
+                { _id: updated._id },
+                { $set: { fcmTokens: [], fcmTokenMobile: [] } },
+            ),
+        ]);
+    }
+
     return updated;
 }
 

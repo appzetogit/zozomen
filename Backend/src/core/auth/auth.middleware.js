@@ -1,6 +1,7 @@
 import { verifyAccessToken } from './token.util.js';
 import { sendError } from '../../utils/response.js';
 import { FoodUser } from '../users/user.model.js';
+import { FoodDeliveryPartner } from '../../modules/food/delivery/models/deliveryPartner.model.js';
 
 export const requireAdmin = (req, res, next) => {
     if (req.user?.role !== 'ADMIN') {
@@ -28,6 +29,15 @@ export const authMiddleware = (req, res, next) => {
             FoodUser.findById(decoded.userId).select('isActive').lean().then((doc) => {
                 if (!doc || doc.isActive === false) {
                     return sendError(res, 401, 'User account is deactivated');
+                }
+                next();
+            }).catch(() => sendError(res, 401, 'Authentication failed'));
+            return;
+        }
+        if (decoded.role === 'DELIVERY_PARTNER') {
+            FoodDeliveryPartner.findById(decoded.userId).select('isActive').lean().then((doc) => {
+                if (!doc || doc.isActive === false) {
+                    return sendError(res, 401, 'Delivery account is inactive');
                 }
                 next();
             }).catch(() => sendError(res, 401, 'Authentication failed'));

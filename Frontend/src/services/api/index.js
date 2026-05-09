@@ -349,6 +349,12 @@ export const adminAPI = {
         contextModule: "admin",
       },
     ),
+  updateDeliveryPartnerActiveStatus: (id, isActive) =>
+    apiClient.patch(
+      `/food/admin/delivery/${String(id)}/active-status`,
+      { isActive: isActive !== false },
+      { contextModule: "admin" },
+    ),
   /** GET /food/admin/delivery/support-tickets - list all delivery support tickets (query: status, priority, search, page, limit). */
   getDeliverySupportTickets: (params) =>
     apiClient.get("/food/admin/delivery/support-tickets", {

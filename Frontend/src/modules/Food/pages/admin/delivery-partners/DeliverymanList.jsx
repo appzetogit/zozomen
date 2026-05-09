@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react"
-import { Search, Download, ChevronDown, Eye, User, Star, ArrowUpDown, Settings, FileText, FileSpreadsheet, Loader2, Check, Columns, ExternalLink, Calendar, MapPin, CreditCard, Mail, Phone, Bike, FileCheck, Pencil, Save, Trash2, X } from "lucide-react"
+import { Search, Download, ChevronDown, Eye, User, Star, ArrowUpDown, Settings, FileText, FileSpreadsheet, Loader2, Check, Columns, ExternalLink, Calendar, MapPin, CreditCard, Mail, Phone, Bike, FileCheck, Pencil, Save, X } from "lucide-react"
 import { adminAPI } from "@food/api"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@food/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@food/components/ui/dialog"
@@ -25,7 +25,7 @@ export default function DeliverymanList() {
   const [editingDeliveryId, setEditingDeliveryId] = useState(null)
   const [editValues, setEditValues] = useState({ pocketBalance: "", cashInHand: "" })
   const [savingDeliveryId, setSavingDeliveryId] = useState(null)
-  const [deletingDeliveryId, setDeletingDeliveryId] = useState(null)
+  const [activeUpdatingId, setActiveUpdatingId] = useState(null)
   const [visibleColumns, setVisibleColumns] = useState({
     si: true,
     name: true,
@@ -337,15 +337,16 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
     }
   }
 
-  const handleDelete = async (deliveryman) => {
+  const handleToggleActiveStatus = async (deliveryman) => {
     const deliverymanId = String(deliveryman?._id || "")
     if (!deliverymanId) {
       toast.error("Delivery partner not found")
       return
     }
 
+    const nextIsActive = deliveryman?.isActive !== false ? false : true
     const confirmed = window.confirm(
-      `Deactivate ${deliveryman?.name || "this delivery partner"}?\n\nThis will block the account and log them out, while preserving profile, wallet, and history.`,
+      `${nextIsActive ? "Activate" : "Deactivate"} ${deliveryman?.name || "this delivery partner"}?\n\n${nextIsActive ? "Partner will be able to login again." : "Partner will be logged out and login will be blocked until re-activated."}`,
     )
 
     if (!confirmed) {
@@ -353,28 +354,30 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
     }
 
     try {
-      setDeletingDeliveryId(deliverymanId)
-      const response = await adminAPI.deleteDeliveryPartner(deliverymanId)
+      setActiveUpdatingId(deliverymanId)
+      const response = await adminAPI.updateDeliveryPartnerActiveStatus(deliverymanId, nextIsActive)
 
       if (!response?.data?.success) {
-        toast.error(response?.data?.message || "Failed to deactivate delivery partner")
+        toast.error(response?.data?.message || "Failed to update delivery partner status")
         return
       }
 
-      const wasViewingDeletedPartner = Boolean(
-        viewDetails && String(viewDetails._id) === deliverymanId,
+      setDeliverymen((prev) =>
+        prev.map((item) =>
+          String(item._id) === deliverymanId
+            ? { ...item, isActive: nextIsActive, availabilityStatus: nextIsActive ? item.availabilityStatus : "offline" }
+            : item,
+        ),
       )
-      setDeliverymen((prev) => prev.filter((item) => String(item._id) !== deliverymanId))
-      setViewDetails((prev) => (prev && String(prev._id) === deliverymanId ? null : prev))
-      if (wasViewingDeletedPartner) {
-        setIsViewOpen(false)
-      }
-      toast.success(response?.data?.message || "Delivery partner deactivated successfully")
+      setViewDetails((prev) =>
+        prev && String(prev._id) === deliverymanId ? { ...prev, isActive: nextIsActive } : prev,
+      )
+      toast.success(response?.data?.message || `Delivery partner ${nextIsActive ? "activated" : "deactivated"} successfully`)
     } catch (err) {
-      debugError("Error deleting delivery partner:", err)
-      toast.error(err?.response?.data?.message || "Failed to deactivate delivery partner")
+      debugError("Error updating delivery partner active status:", err)
+      toast.error(err?.response?.data?.message || "Failed to update delivery partner status")
     } finally {
-      setDeletingDeliveryId(null)
+      setActiveUpdatingId(null)
     }
   }
 
@@ -645,7 +648,7 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                           <td className="px-6 py-4">
                             <div className="flex flex-col">
                               <span className="text-xs">
-                                Active Status: <span className={`${dm.status === 'Online' ? 'text-blue-600' : 'text-slate-600'} underline`}>{dm.status}</span>
+                                Account Status: <span className={`${dm.isActive !== false ? 'text-emerald-700' : 'text-rose-700'} underline`}>{dm.isActive !== false ? "active" : "inactive"}</span>
                               </span>
                             </div>
                           </td>
@@ -689,15 +692,15 @@ availableCashLimit: deliveryman.availableCashLimit || 0,
                                 <Eye className="w-4 h-4" />
                               </button>
                               <button
-                                onClick={() => handleDelete(dm)}
-                                disabled={deletingDeliveryId === String(dm._id)}
-                                className="p-1.5 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
-                                title="Delete Delivery Partner"
+                                onClick={() => handleToggleActiveStatus(dm)}
+                                disabled={activeUpdatingId === String(dm._id)}
+                                className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors disabled:opacity-50 ${dm.isActive !== false ? "bg-red-50 text-red-700 hover:bg-red-100" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
+                                title={dm.isActive !== false ? "Deactivate Delivery Partner" : "Activate Delivery Partner"}
                               >
-                                {deletingDeliveryId === String(dm._id) ? (
+                                {activeUpdatingId === String(dm._id) ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
                                 ) : (
-                                  <Trash2 className="w-4 h-4" />
+                                  dm.isActive !== false ? "Deactivate" : "Activate"
                                 )}
                               </button>
                             </div>

@@ -417,6 +417,12 @@ export const verifyDeliveryOtpAndLogin = async (phone, otp, fcmToken, platform) 
     return { needsRegistration: true, phone };
   }
 
+  if (deliveryPartner.isActive === false) {
+    throw new AuthError(
+      "Your delivery account has been deactivated by admin. Please contact support.",
+    );
+  }
+
   // Update FCM token if provided - CRITICAL: do this BEFORE returning pendingApproval
   // so we can notify them when approved.
   if (fcmToken) {

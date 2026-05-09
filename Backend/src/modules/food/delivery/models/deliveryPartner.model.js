@@ -79,6 +79,11 @@ const deliveryPartnerSchema = new mongoose.Schema(
             enum: ['pending', 'approved', 'rejected'],
             default: 'pending'
         },
+        isActive: {
+            type: Boolean,
+            default: true,
+            index: true
+        },
         rejectionReason: { type: String },
         rejectedAt: { type: Date },
         approvedAt: { type: Date },
