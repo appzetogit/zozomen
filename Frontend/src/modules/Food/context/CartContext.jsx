@@ -199,6 +199,12 @@ export function CartProvider({ children }) {
       const currentOrderType = getItemOrderType(safeCart[0])
       const nextOrderType = getItemOrderType(item)
 
+      // Prevent mixing Food and Quick Commerce
+      if (currentOrderType !== nextOrderType) {
+        const message = `Cart already contains ${currentOrderType} items. Please clear cart or complete order first.`
+        return { ok: false, error: message, code: 'ORDER_TYPE_MISMATCH' }
+      }
+
       if (currentOrderType === "food" && nextOrderType === "food") {
         const firstItemRestaurantId = safeCart[0]?.restaurantId
         const firstItemRestaurantName = safeCart[0]?.restaurant

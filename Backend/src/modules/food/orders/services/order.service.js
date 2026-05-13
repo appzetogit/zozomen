@@ -315,44 +315,13 @@ function buildPickupPointsFromItems(items = [], sourceMap = new Map()) {
 }
 
 async function evaluateCombinedPickupEligibility(pickupPoints = [], deliveryAddress) {
-  const foodPickup = pickupPoints.find((point) => point.pickupType === "food");
-  const quickPickup = pickupPoints.find((point) => point.pickupType === "quick");
-  const foodPoint = getPointLatLng(foodPickup?.location);
-  const quickPoint = getPointLatLng(quickPickup?.location);
-  const userPoint = getPointLatLng(deliveryAddress?.location);
-  if (!foodPoint || !quickPoint || !userPoint) {
-    return {
-      eligible: false,
-      pickupDistanceKm: null,
-      sameDirection: false,
-      reason: "Pickup or delivery coordinates are unavailable",
-    };
-  }
-
-  // Fetch dynamic settings
-  const feeDoc = await FoodFeeSettings.findOne({ isActive: true }).sort({ createdAt: -1 }).lean();
-  const distLimit = feeDoc?.mixedOrderDistanceLimit ?? 2;
-  const angleLimit = feeDoc?.mixedOrderAngleLimit ?? 35;
-
-  const pickupDistanceKm = haversineKm(foodPoint.lat, foodPoint.lng, quickPoint.lat, quickPoint.lng);
-  const angle = angleBetweenPickupVectors(userPoint, foodPoint, quickPoint);
-  
-  // If pickups are very close to each other (e.g. < 200m), they are definitely in the same direction for practical purposes
-  const isVeryClose = pickupDistanceKm <= 0.2;
-  const sameDirection = isVeryClose || (angle == null ? false : angle <= angleLimit);
-  
-  const eligible = pickupDistanceKm <= distLimit && sameDirection;
   return {
-    eligible,
-    distanceLimitKm: Number(distLimit),
-    angleLimitDeg: Number(angleLimit),
-    pickupDistanceKm: Number.isFinite(pickupDistanceKm) ? Number(pickupDistanceKm.toFixed(2)) : null,
-    sameDirection,
-    reason: eligible
-      ? "Pickups are close and aligned for a shared rider"
-      : pickupDistanceKm > distLimit
-        ? `Pickups are more than ${distLimit} km apart`
-        : `Pickups are not in the same direction (exceeds ${angleLimit}° deviation)`,
+    eligible: false,
+    distanceLimitKm: 0,
+    angleLimitDeg: 0,
+    pickupDistanceKm: null,
+    sameDirection: false,
+    reason: "Mixed orders are disabled",
   };
 }
 
@@ -1504,12 +1473,15 @@ export async function calculateOrder(userId, dto) {
   const items = normalizeOrderItems(dto.items, dto.orderType);
   const hasFoodItems = items.some((item) => item.type === "food");
   const hasQuickItems = items.some((item) => item.type === "quick");
+
+  if (hasFoodItems && hasQuickItems) {
+    throw new ValidationError("Mixed orders (Food + Quick Commerce) are not allowed. Please place separate orders.");
+  }
+
   const orderType =
-    hasFoodItems && hasQuickItems
-      ? "mixed"
-      : hasQuickItems
-        ? "quick"
-        : "food";
+    hasQuickItems
+      ? "quick"
+      : "food";
   const subtotal = items.reduce(
     (sum, it) => sum + (Number(it.price) || 0) * (Number(it.quantity) || 1),
     0,
@@ -1829,12 +1801,15 @@ export async function createOrder(userId, dto) {
   const items = normalizeOrderItems(dto.items, dto.orderType);
   const hasFoodItems = items.some((item) => item.type === "food");
   const hasQuickItems = items.some((item) => item.type === "quick");
+
+  if (hasFoodItems && hasQuickItems) {
+    throw new ValidationError("Mixed orders (Food + Quick Commerce) are not allowed. Please place separate orders.");
+  }
+
   const orderType =
-    hasFoodItems && hasQuickItems
-      ? "mixed"
-      : hasQuickItems
-        ? "quick"
-        : "food";
+    hasQuickItems
+      ? "quick"
+      : "food";
   const sourceMap = await fetchPickupSourcesByType(items);
   const foodSourceIds = [
     ...new Set(

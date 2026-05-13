@@ -1975,15 +1975,6 @@ export default function Cart() {
     })
   }
 
-  if (hasQuickItems && hasFoodItems) {
-    return (
-      <MixedSharedCart 
-        initialAddress={defaultAddress} 
-        addressMode={deliveryAddressMode} 
-      />
-    )
-  }
-
   if (isQuickCart) {
     return (
       <QuickSharedCart 
