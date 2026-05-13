@@ -40,7 +40,7 @@ const defaultCartContext = {
 
 const CartContext = createContext(defaultCartContext)
 
-const getItemOrderType = (item) => (item?.orderType === "quick" ? "quick" : "food")
+const getItemOrderType = (item) => (isQuickCartItem(item) ? "quick" : "food")
 const getItemSourceId = (item, orderType) =>
   String(
     item?.sourceId ||
@@ -49,11 +49,30 @@ const getItemSourceId = (item, orderType) =>
         : item?.restaurantId || item?.sourceRestaurantId || ""),
   )
 
+const isQuickCartItem = (item) => {
+  if (!item || typeof item !== "object") return false;
+  if (item.orderType === "quick" || item.type === "quick") return true;
+
+  return Boolean(
+    item.quickStoreId ||
+      item.storeId ||
+      item.store?.id ||
+      item.store?._id ||
+      item.sellerId ||
+      item.seller?.id ||
+      item.seller?._id
+  );
+};
+
 const normalizeCartData = (rawCart) => {
   if (!Array.isArray(rawCart)) return []
 
   return rawCart
-    .filter((item) => item && typeof item === "object")
+    .filter((item) => {
+      if (!item || typeof item !== "object") return false;
+      // Filter out quick commerce items from the food cart
+      return !isQuickCartItem(item);
+    })
     .map((item, index) => {
       const parsedQuantity = Number(item.quantity)
       const parsedPrice = Number(item.price)
@@ -194,6 +213,12 @@ export function CartProvider({ children }) {
   }, [cart])
 
   const addToCart = (item, sourcePosition = null) => {
+    // Explicitly reject quick commerce items from the food cart
+    if (isQuickCartItem(item)) {
+      debugWarn('? Blocked attempt to add Quick Commerce item to Food cart', item);
+      return { ok: false, error: 'Quick Commerce items are handled separately.', code: 'INVALID_TYPE' };
+    }
+
     const safeCart = normalizeCartData(cart)
     if (safeCart.length > 0) {
       const currentOrderType = getItemOrderType(safeCart[0])
